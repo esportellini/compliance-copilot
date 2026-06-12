@@ -1,0 +1,66 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
+
+# ── Node / Next.js ─────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.yarn/
+
+# ── Environment — NEVER commit .env ──────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.*.local
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Databases ──────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+pgdata/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Uploads / temp ────────────────────────────────────────────────────────────
+uploads/
+tmp/
+temp/

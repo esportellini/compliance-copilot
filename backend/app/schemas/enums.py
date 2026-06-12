@@ -1,0 +1,49 @@
+from enum import Enum
+
+
+class Decision(str, Enum):
+    ALLOWED = "ALLOWED"
+    REPORT_REQUIRED = "REPORT_REQUIRED"
+    PRE_APPROVAL_REQUIRED = "PRE_APPROVAL_REQUIRED"
+    RESTRICTED = "RESTRICTED"
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+
+class RiskLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class ProductStatus(str, Enum):
+    ALLOWED = "ALLOWED"
+    MONITORED = "MONITORED"
+    RESTRICTED = "RESTRICTED"
+    BLOCKED = "BLOCKED"
+
+
+class DocumentStatus(str, Enum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    ARCHIVED = "ARCHIVED"
+
+
+class PreApprovalStatus(str, Enum):
+    PENDING = "PENDING"
+    IN_REVIEW = "IN_REVIEW"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    APPROVED_WITH_CONDITIONS = "APPROVED_WITH_CONDITIONS"
+    CANCELLED = "CANCELLED"
+
+
+class ProductType(str, Enum):
+    OPEN_FUND = "OPEN_FUND"
+    CLOSED_FUND = "CLOSED_FUND"
+    EXCLUSIVE_FUND = "EXCLUSIVE_FUND"
+    STOCK = "STOCK"
+    DERIVATIVE = "DERIVATIVE"
+    CRYPTO = "CRYPTO"
+    IPO = "IPO"
+    FIXED_INCOME = "FIXED_INCOME"
+    OTHER = "OTHER"

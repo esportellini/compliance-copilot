@@ -1,0 +1,176 @@
+"""Structured compliance rules engine.
+
+The engine is deliberately pure: it takes a context object and a list of rules
+and returns a decision. No database access here, which keeps it trivial to unit
+test and means the same logic runs in the API, in tests, and in the seed script.
+
+The central invariant the product depends on:
+
+    A structured restrictive decision (RESTRICTED) can never be relaxed by the
+    LLM layer downstream. The engine is the source of truth; the model only adds
+    natural language and supporting sources on top of it.
+"""
+from dataclasses import dataclass, field
+
+from app.schemas.enums import Decision, RiskLevel
+
+# how restrictive each decision is — used when several rules match and we need a
+# deterministic winner. Higher = more restrictive.
+_SEVERITY = {
+    Decision.ALLOWED: 0,
+    Decision.REPORT_REQUIRED: 1,
+    Decision.PRE_APPROVAL_REQUIRED: 2,
+    Decision.RESTRICTED: 3,
+    Decision.INCONCLUSIVE: 4,
+}
+
+_DECISION_RISK = {
+    Decision.ALLOWED: RiskLevel.LOW,
+    Decision.REPORT_REQUIRED: RiskLevel.MEDIUM,
+    Decision.PRE_APPROVAL_REQUIRED: RiskLevel.MEDIUM,
+    Decision.RESTRICTED: RiskLevel.HIGH,
+    Decision.INCONCLUSIVE: RiskLevel.MEDIUM,
+}
+
+# product types we want a human to look at rather than auto-deciding.
+_MANUAL_REVIEW_TYPES = {"CLOSED_FUND", "EXCLUSIVE_FUND"}
+
+# fallback defaults applied only when no configured rule covers the product type.
+_BUILTIN_DEFAULTS: dict[str, Decision] = {
+    "OPEN_FUND": Decision.ALLOWED,
+    "STOCK": Decision.PRE_APPROVAL_REQUIRED,
+    "DERIVATIVE": Decision.RESTRICTED,
+    "CRYPTO": Decision.RESTRICTED,
+    "IPO": Decision.PRE_APPROVAL_REQUIRED,
+    "FIXED_INCOME": Decision.ALLOWED,
+}
+
+
+@dataclass
+class RuleSpec:
+    """A configured ComplianceRule reduced to what the engine needs."""
+
+    name: str
+    decision: Decision
+    risk: RiskLevel
+    priority: int
+    product_type: str | None = None
+    condition: dict = field(default_factory=dict)
+
+
+@dataclass
+class EvaluationContext:
+    product_type: str | None = None
+    product_status: str | None = None  # ALLOWED / MONITORED / RESTRICTED / BLOCKED
+    on_restricted_list: bool = False
+    amount: float | None = None
+    human_review_threshold: float = 100_000.0
+
+
+@dataclass
+class EvaluationResult:
+    decision: Decision
+    reason: str
+    matched_rules: list[str]
+    risk_level: RiskLevel
+    requires_human_review: bool
+
+
+def _condition_matches(condition: dict, ctx: EvaluationContext) -> bool:
+    """A rule fires when every key in its condition is satisfied."""
+    if not condition:
+        return True
+    if "status" in condition and ctx.product_status != condition["status"]:
+        return False
+    if "product_type" in condition and ctx.product_type != condition["product_type"]:
+        return False
+    if "amount_gt" in condition and not (ctx.amount or 0) > condition["amount_gt"]:
+        return False
+    if "amount_gte" in condition and not (ctx.amount or 0) >= condition["amount_gte"]:
+        return False
+    return True
+
+
+def evaluate(ctx: EvaluationContext, rules: list[RuleSpec]) -> EvaluationResult:
+    needs_review = bool(
+        ctx.amount is not None and ctx.amount > ctx.human_review_threshold
+    )
+
+    # 1. Hard restrictions short-circuit everything. The AI can never relax these.
+    if ctx.on_restricted_list:
+        return EvaluationResult(
+            decision=Decision.RESTRICTED,
+            reason="Ativo presente na lista restrita interna.",
+            matched_rules=["restricted_list"],
+            risk_level=RiskLevel.HIGH,
+            requires_human_review=True,
+        )
+    if ctx.product_status in {"BLOCKED", "RESTRICTED"}:
+        return EvaluationResult(
+            decision=Decision.RESTRICTED,
+            reason=f"Produto com status {ctx.product_status} no catálogo.",
+            matched_rules=["product_status"],
+            risk_level=RiskLevel.HIGH,
+            requires_human_review=True,
+        )
+
+    # 2. Configured rules. Consider generic rules and rules for this product type.
+    applicable = [
+        r
+        for r in rules
+        if (r.product_type in (None, ctx.product_type)) and _condition_matches(r.condition, ctx)
+    ]
+    applicable.sort(key=lambda r: r.priority)
+
+    if applicable:
+        top_priority = applicable[0].priority
+        top_rules = [r for r in applicable if r.priority == top_priority]
+        distinct = {r.decision for r in top_rules}
+        # 2a. genuine conflict at the same priority -> inconclusive
+        if len(distinct) > 1:
+            return EvaluationResult(
+                decision=Decision.INCONCLUSIVE,
+                reason="Regras de mesma prioridade com decisões conflitantes.",
+                matched_rules=[r.name for r in top_rules],
+                risk_level=RiskLevel.MEDIUM,
+                requires_human_review=True,
+            )
+        # 2b. otherwise the most restrictive among all applicable rules wins
+        winner = max(applicable, key=lambda r: _SEVERITY[r.decision])
+        return EvaluationResult(
+            decision=winner.decision,
+            reason=f"Regra aplicada: {winner.name}.",
+            matched_rules=[r.name for r in applicable],
+            risk_level=winner.risk,
+            requires_human_review=needs_review or winner.decision == Decision.RESTRICTED,
+        )
+
+    # 3. Product types that always require a human (closed / exclusive funds).
+    if ctx.product_type in _MANUAL_REVIEW_TYPES:
+        return EvaluationResult(
+            decision=Decision.INCONCLUSIVE,
+            reason="Fundo fechado/exclusivo exige análise manual de compliance.",
+            matched_rules=["manual_review_type"],
+            risk_level=RiskLevel.MEDIUM,
+            requires_human_review=True,
+        )
+
+    # 4. Built-in defaults by product type.
+    if ctx.product_type in _BUILTIN_DEFAULTS:
+        decision = _BUILTIN_DEFAULTS[ctx.product_type]
+        return EvaluationResult(
+            decision=decision,
+            reason=f"Decisão padrão para o tipo de produto {ctx.product_type}.",
+            matched_rules=["builtin_default"],
+            risk_level=_DECISION_RISK[decision],
+            requires_human_review=needs_review or decision == Decision.RESTRICTED,
+        )
+
+    # 5. Nothing to go on -> inconclusive (never guess).
+    return EvaluationResult(
+        decision=Decision.INCONCLUSIVE,
+        reason="Não há regra ou tipo de produto suficiente para decidir com segurança.",
+        matched_rules=[],
+        risk_level=RiskLevel.MEDIUM,
+        requires_human_review=True,
+    )
