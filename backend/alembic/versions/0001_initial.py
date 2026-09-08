@@ -197,6 +197,7 @@ def upgrade() -> None:
         "pre_approval_requests",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("requester_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("source_query_id", sa.Integer(), sa.ForeignKey("copilot_queries.id", ondelete="SET NULL"), nullable=True),
         sa.Column("product_id", sa.Integer(), sa.ForeignKey("financial_products.id"), nullable=True),
         sa.Column("product_label", sa.String(255), nullable=True),
         sa.Column("operation_type", sa.String(48), nullable=False),
@@ -204,13 +205,16 @@ def upgrade() -> None:
         sa.Column("intended_date", sa.Date(), nullable=True),
         sa.Column("justification", sa.Text(), nullable=True),
         sa.Column("copilot_initial_response", sa.Text(), nullable=True),
+        sa.Column("copilot_initial_decision", sa.String(32), nullable=True),
         sa.Column("status", sa.String(32), nullable=False),
         sa.Column("compliance_opinion", sa.Text(), nullable=True),
         sa.Column("reviewer", sa.String(255), nullable=True),
         sa.Column("decided_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("review_started_at", sa.DateTime(timezone=True), nullable=True),
         *_timestamps(),
     )
     op.create_index("ix_pre_approval_requests_requester_id", "pre_approval_requests", ["requester_id"])
+    op.create_index("ix_pre_approval_requests_source_query_id", "pre_approval_requests", ["source_query_id"])
     op.create_index("ix_pre_approval_requests_status", "pre_approval_requests", ["status"])
 
     op.create_table(

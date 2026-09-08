@@ -11,6 +11,9 @@ class PreApprovalRequest(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    source_query_id: Mapped[int | None] = mapped_column(
+        ForeignKey("copilot_queries.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     product_id: Mapped[int | None] = mapped_column(
         ForeignKey("financial_products.id"), nullable=True
     )
@@ -20,12 +23,17 @@ class PreApprovalRequest(Base, TimestampMixin):
     intended_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)
     copilot_initial_response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    copilot_initial_decision: Mapped[str | None] = mapped_column(String(32), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="PENDING", index=True)
     compliance_opinion: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewer: Mapped[str | None] = mapped_column(String(255), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     requester = relationship("User", back_populates="pre_approvals")
+    source_query = relationship("CopilotQuery")
     comments = relationship(
         "PreApprovalComment", back_populates="request", cascade="all, delete-orphan"
     )

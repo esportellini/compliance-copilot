@@ -252,11 +252,23 @@ pedido normal de liberação.
 ### Fluxo de Pré-aprovação
 
 ```
-Colaborador cria → Copilot faz análise inicial automática
-→ Compliance revisa → APROVADO / REPROVADO / APROVADO COM RESSALVAS
-→ AuditLog em todas as transições
-→ Comentários no thread
+Consulta vinculada → reutiliza a análise persistida, sem recalcular o Copilot
+→ PENDING → IN_REVIEW → APROVADO / REPROVADO / APROVADO COM RESSALVAS
+→ comentários, timestamps e decisões aparecem na timeline e no AuditLog
 ```
+
+Solicitações também podem ser criadas sem consulta de origem; nesse caso, o
+Copilot executa uma análise inicial nova. O vínculo opcional com a consulta e
+os snapshots da decisão, resposta e produto preservam a rastreabilidade.
+
+## Demo flow
+
+1. Entre como `colaborador@demo.local` com a senha `Compliance123!`.
+2. No Copilot, pergunte sobre `XPTO3` e abra a pré-aprovação gerada.
+3. Selecione o tipo de operação, envie a solicitação e abra seu detalhe.
+4. Entre como `compliance@demo.local`, inicie a revisão, comente e registre a decisão com parecer.
+5. Volte ao colaborador para consultar a decisão, as condições e a timeline.
+6. Entre como `auditor@demo.local` para inspecionar a solicitação e a trilha de auditoria em modo somente leitura.
 
 ---
 

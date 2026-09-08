@@ -21,7 +21,7 @@ Authorization: Bearer <access_token>
 ### Copilot
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/copilot/query` | Submit a compliance query |
+| POST | `/copilot/query` | Submit a compliance query (admin/compliance/employee) |
 | GET | `/copilot/history` | List queries (scoped by role) |
 | GET | `/copilot/history/{id}` | Query detail with sources |
 
@@ -61,10 +61,10 @@ Authorization: Bearer <access_token>
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/pre-approvals` | List (scoped by role) |
-| POST | `/pre-approvals` | Create (any role) |
+| POST | `/pre-approvals` | Create; optionally link `source_query_id` owned by the caller (admin/compliance/employee) |
 | GET | `/pre-approvals/{id}` | Detail |
-| PATCH | `/pre-approvals/{id}/status` | Update status (compliance+) |
-| POST | `/pre-approvals/{id}/comments` | Add comment |
+| PATCH | `/pre-approvals/{id}/status` | Review/decide (compliance+) or cancel own pending request (employee) |
+| POST | `/pre-approvals/{id}/comments` | Add comment (admin/compliance/employee; employee scoped to own) |
 
 ### Audit & Reports
 | Method | Path | Description |

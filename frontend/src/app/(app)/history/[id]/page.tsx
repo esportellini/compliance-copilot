@@ -29,7 +29,11 @@ export default function HistoryDetailPage() {
   });
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner className="h-8 w-8" /></div>;
-  if (error || !data) return <Alert variant="error">Consulta não encontrada.</Alert>;
+  if (error || !data) return (
+    <Alert variant="error">
+      {(error as any)?.response?.data?.detail ?? "Não foi possível carregar a consulta."}
+    </Alert>
+  );
 
   const ans = data.answer;
   const decision = ans.decision as DecisionKey;
@@ -52,8 +56,10 @@ export default function HistoryDetailPage() {
       <div className="card p-5 mb-4">
         <p className="text-xs text-slate-500 mb-1">Pergunta</p>
         <p className="text-sm text-slate-800 font-medium">{data.question}</p>
-        {(data.product_type || data.amount || data.objective) && (
+        {(data.product_label || data.product_identifier || data.product_type || data.amount || data.objective) && (
           <div className="mt-3 space-y-1.5 pt-3 border-t border-slate-100">
+            <DetailRow label="Produto" value={data.product_label} />
+            <DetailRow label="Ticker/identificador" value={data.product_identifier} />
             <DetailRow label="Tipo de produto" value={data.product_type} />
             <DetailRow label="Valor" value={data.amount ? fmtCurrency(data.amount) : null} />
             <DetailRow label="Objetivo" value={data.objective} />
@@ -113,7 +119,10 @@ export default function HistoryDetailPage() {
             {ans.sources.map((s: any, i: number) => (
               <div key={i} className="px-5 py-3">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-medium text-slate-700">{s.document_name}</p>
+                  <p className="text-xs font-medium text-slate-700">
+                    {[s.document_name, s.section_title, s.page_number ? `pág. ${s.page_number}` : null]
+                      .filter(Boolean).join(" · ")}
+                  </p>
                   <span className="text-xs text-slate-400">{Math.round(s.score * 100)}% relevância</span>
                 </div>
                 <p className="text-xs text-slate-500 line-clamp-3">{s.excerpt}</p>

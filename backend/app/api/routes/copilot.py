@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_roles
 from app.core.permissions import Role
 from app.db.session import get_db
 from app.models.copilot import CopilotAnswer, CopilotQuery
+from app.models.product import FinancialProduct
 from app.models.user import User
 from app.schemas.copilot import (
     CopilotAnswerOut,
@@ -17,13 +18,14 @@ from app.schemas.enums import Decision, RiskLevel
 from app.services.copilot import CopilotInput, run_query
 
 router = APIRouter(prefix="/copilot", tags=["copilot"])
+_COPILOT_WRITER = require_roles(Role.ADMIN, Role.COMPLIANCE, Role.EMPLOYEE)
 
 
 @router.post("/query", response_model=CopilotAnswerOut)
 def query_copilot(
     payload: CopilotQueryRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_COPILOT_WRITER),
 ):
     inp = CopilotInput(
         user_id=user.id,
@@ -120,11 +122,20 @@ def history_detail(
     if not ans:
         raise HTTPException(status_code=404, detail="Resposta não disponível")
 
+    product = db.get(FinancialProduct, row.product_id) if row.product_id else None
+    product_label = None
+    if product:
+        product_label = product.name
+        if product.identifier:
+            product_label = f"{product.name} ({product.identifier})"
+
     return CopilotHistoryDetail(
         id=row.id,
         question=row.question,
         product_type=row.product_type,
         product_id=row.product_id,
+        product_label=product_label,
+        product_identifier=product.identifier if product else None,
         amount=row.amount,
         objective=row.objective,
         created_at=row.created_at,

@@ -65,3 +65,16 @@ def test_initial_migration_preserves_postgres_specific_types_and_identifier_inde
 
     product_tags = Base.metadata.tables["financial_products"].c.tags
     assert product_tags.type.compile(dialect=postgresql.dialect()) == "VARCHAR[]"
+
+
+def test_pre_approval_keeps_optional_query_trace_with_set_null_semantics():
+    table = Base.metadata.tables["pre_approval_requests"]
+    source_query = table.c.source_query_id
+    foreign_key = next(iter(source_query.foreign_keys))
+
+    assert source_query.nullable is True
+    assert foreign_key.target_fullname == "copilot_queries.id"
+    assert foreign_key.ondelete == "SET NULL"
+    assert {"copilot_initial_decision", "review_started_at"} <= {
+        column.name for column in table.columns
+    }

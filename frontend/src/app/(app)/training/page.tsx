@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
@@ -26,6 +27,8 @@ const TERMS = [
 
 export default function TrainingPage() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canAcknowledge = !!user && ["ADMIN", "EMPLOYEE"].includes(user.role);
   const [acceptedTerms, setAcceptedTerms] = useState<Set<number>>(new Set());
   const [termsSaved, setTermsSaved] = useState(false);
 
@@ -114,8 +117,8 @@ export default function TrainingPage() {
                     className={`card p-5 transition-colors ${item.acknowledged ? "border-emerald-200 bg-emerald-50/30" : ""}`}>
                     <div className="flex items-start gap-4">
                       <button
-                        onClick={() => !item.acknowledged && ack.mutate(item.id)}
-                        disabled={item.acknowledged}
+                        onClick={() => canAcknowledge && !item.acknowledged && ack.mutate(item.id)}
+                        disabled={item.acknowledged || !canAcknowledge}
                         className="shrink-0 mt-0.5">
                         {item.acknowledged
                           ? <CheckCircle2 size={20} className="text-emerald-500" />
@@ -133,7 +136,7 @@ export default function TrainingPage() {
                           )}
                         </div>
                         <p className="text-sm text-slate-500 leading-relaxed">{item.body}</p>
-                        {!item.acknowledged && (
+                        {canAcknowledge && !item.acknowledged && (
                           <button
                             onClick={() => ack.mutate(item.id)}
                             className="mt-3 text-xs text-brand-600 hover:text-brand-700 font-medium">
@@ -163,13 +166,16 @@ export default function TrainingPage() {
                 type="checkbox"
                 checked={acceptedTerms.has(i)}
                 onChange={() => toggleTerm(i)}
+                disabled={!canAcknowledge}
                 className="mt-0.5 rounded border-slate-300"
               />
               <span className="text-sm text-slate-700 group-hover:text-slate-900">{term}</span>
             </label>
           ))}
         </div>
-        {termsSaved ? (
+        {!canAcknowledge ? (
+          <Alert variant="info" className="text-sm">Visualização somente leitura para Auditor.</Alert>
+        ) : termsSaved ? (
           <Alert variant="success" className="text-sm">
             Termos registrados. Obrigado por confirmar o uso responsável do Copilot.
           </Alert>

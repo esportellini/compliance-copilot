@@ -2,7 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_admin, require_roles
+from app.core.permissions import Role
 from app.db.session import get_db
 from app.models.training import TrainingItem, UserTrainingAcknowledgement
 from app.models.user import User
@@ -10,6 +11,7 @@ from app.schemas.common import TrainingAcknowledge, TrainingItemOut
 from app.services.audit import log_event
 
 router = APIRouter(prefix="/training", tags=["training"])
+_TRAINING_WRITER = require_roles(Role.ADMIN, Role.EMPLOYEE)
 
 # checklist de termos — itens separados dos conteúdos educativos
 TERM_ITEMS = [
@@ -45,7 +47,7 @@ def list_training(
 def acknowledge(
     payload: TrainingAcknowledge,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_TRAINING_WRITER),
 ):
     item = db.get(TrainingItem, payload.training_item_id)
     if not item:

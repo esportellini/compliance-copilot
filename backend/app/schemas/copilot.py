@@ -57,6 +57,8 @@ class CopilotHistoryDetail(BaseModel):
     question: str
     product_type: str | None
     product_id: int | None
+    product_label: str | None
+    product_identifier: str | None
     amount: float | None
     objective: str | None
     created_at: datetime

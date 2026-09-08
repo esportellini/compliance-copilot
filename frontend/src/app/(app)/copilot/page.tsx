@@ -7,6 +7,7 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -136,7 +137,10 @@ function AnswerCard({ result, onOpenPreApproval }: { result: any; onOpenPreAppro
               <div className="mt-3 space-y-2">
                 {result.sources.map((s: any, i: number) => (
                   <div key={i} className="bg-slate-50 rounded-lg px-4 py-3 text-xs">
-                    <p className="font-medium text-slate-700 mb-1">{s.document_name}</p>
+                    <p className="font-medium text-slate-700 mb-1">
+                      {[s.document_name, s.section_title, s.page_number ? `pág. ${s.page_number}` : null]
+                        .filter(Boolean).join(" · ")}
+                    </p>
                     <p className="text-slate-500 line-clamp-3">{s.excerpt}</p>
                     <p className="text-slate-400 mt-1 text-right">
                       relevância {Math.round(s.score * 100)}%
@@ -183,6 +187,7 @@ function AnswerCard({ result, onOpenPreApproval }: { result: any; onOpenPreAppro
 // ─── página principal ─────────────────────────────────────────────────────────
 export default function CopilotPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [result, setResult]       = useState<any>(null);
   const [error, setError]         = useState("");
   const [showAdvanced, setAdv]    = useState(false);
@@ -234,7 +239,11 @@ export default function CopilotPage() {
       </Alert>
 
       {/* formulário */}
-      <div className="card p-6 mb-6">
+      {user?.role === "AUDITOR" ? (
+        <Alert variant="info" className="mb-6">
+          Auditores possuem acesso somente leitura. Consulte o histórico já registrado.
+        </Alert>
+      ) : <div className="card p-6 mb-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* pergunta principal */}
           <div>
@@ -316,7 +325,7 @@ export default function CopilotPage() {
               : <><Send size={14} /> Consultar</>}
           </button>
         </form>
-      </div>
+      </div>}
 
       {/* resultado */}
       {result && (

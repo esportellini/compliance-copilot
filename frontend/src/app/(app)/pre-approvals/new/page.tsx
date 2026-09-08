@@ -1,12 +1,13 @@
 "use client";
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
@@ -38,12 +39,31 @@ export default function NewPreApprovalPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [error, setError] = useState("");
   const fromQuery = searchParams.get("from_query");
+  const sourceQueryId = fromQuery && /^\d+$/.test(fromQuery) ? Number(fromQuery) : null;
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<Form>({
     resolver: zodResolver(schema),
   });
+
+  const sourceQuery = useQuery({
+    queryKey: ["history-detail", sourceQueryId],
+    queryFn: () => api.get(`/copilot/history/${sourceQueryId}`).then((r) => r.data),
+    enabled: sourceQueryId !== null,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!sourceQuery.data) return;
+    reset({
+      product_label: sourceQuery.data.product_label ?? sourceQuery.data.product_identifier ?? "",
+      operation_type: "",
+      estimated_amount: sourceQuery.data.amount ?? "",
+      justification: sourceQuery.data.objective ?? "",
+    });
+  }, [reset, sourceQuery.data]);
 
   const mutation = useMutation({
     mutationFn: (d: Form) => {
@@ -51,6 +71,8 @@ export default function NewPreApprovalPage() {
         product_label: d.product_label,
         operation_type: d.operation_type,
       };
+      if (sourceQueryId !== null) payload.source_query_id = sourceQueryId;
+      if (sourceQuery.data?.product_id) payload.product_id = sourceQuery.data.product_id;
       if (d.estimated_amount) payload.estimated_amount = Number(d.estimated_amount);
       if (d.intended_date) payload.intended_date = d.intended_date;
       if (d.justification) payload.justification = d.justification;
@@ -62,6 +84,10 @@ export default function NewPreApprovalPage() {
     },
     onError: (e: any) => setError(e.response?.data?.detail ?? "Erro ao criar solicitação"),
   });
+
+  if (user?.role === "AUDITOR") {
+    return <Alert variant="info">Auditores possuem acesso somente leitura.</Alert>;
+  }
 
   return (
     <div className="max-w-xl">
@@ -75,7 +101,19 @@ export default function NewPreApprovalPage() {
 
       {fromQuery && (
         <Alert variant="info" className="mb-4">
-          Pré-aprovação vinculada à consulta #{fromQuery}. A análise inicial será gerada automaticamente.
+          Pré-aprovação vinculada à consulta #{fromQuery}. A análise inicial persistida será reutilizada.
+        </Alert>
+      )}
+
+      {fromQuery && !sourceQueryId && (
+        <Alert variant="error" className="mb-4">Identificador de consulta inválido.</Alert>
+      )}
+      {sourceQuery.isLoading && (
+        <Alert variant="info" className="mb-4">Carregando contexto da consulta…</Alert>
+      )}
+      {sourceQuery.error && (
+        <Alert variant="error" className="mb-4">
+          {(sourceQuery.error as any).response?.data?.detail ?? "Não foi possível carregar a consulta vinculada."}
         </Alert>
       )}
 
@@ -85,7 +123,8 @@ export default function NewPreApprovalPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Produto *" error={errors.product_label?.message}>
-              <input {...register("product_label")} className="input" placeholder="Ex: Fundo Alpha ou XPTO3" />
+              <input {...register("product_label")} readOnly={sourceQueryId !== null}
+                className="input read-only:bg-slate-50" placeholder="Ex: Fundo Alpha ou XPTO3" />
             </Field>
             <Field label="Tipo de operação *" error={errors.operation_type?.message}>
               <select {...register("operation_type")} className="input">
@@ -97,7 +136,8 @@ export default function NewPreApprovalPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Valor estimado (R$)">
-              <input {...register("estimated_amount")} type="number" min={0} step={1000} className="input" placeholder="0" />
+              <input {...register("estimated_amount")} readOnly={sourceQueryId !== null}
+                type="number" min={0} step={1000} className="input read-only:bg-slate-50" placeholder="0" />
             </Field>
             <Field label="Data pretendida">
               <input {...register("intended_date")} type="date" className="input" />
@@ -111,8 +151,8 @@ export default function NewPreApprovalPage() {
 
           <div className="flex justify-end gap-3 pt-2">
             <Link href="/pre-approvals" className="btn-ghost text-sm">Cancelar</Link>
-            <button type="submit" disabled={isSubmitting} className="btn-primary text-sm flex items-center gap-2">
-              {isSubmitting && <Spinner className="h-4 w-4 border-white border-t-transparent" />}
+            <button type="submit" disabled={mutation.isPending || sourceQuery.isLoading || !!sourceQuery.error || (!!fromQuery && !sourceQueryId)} className="btn-primary text-sm flex items-center gap-2">
+              {mutation.isPending && <Spinner className="h-4 w-4 border-white border-t-transparent" />}
               Submeter solicitação
             </button>
           </div>

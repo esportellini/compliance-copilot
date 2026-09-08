@@ -3,10 +3,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_compliance
+from app.api.deps import get_current_user, require_roles
 from app.core.permissions import Role
 from app.db.session import get_db
+from app.models.copilot import CopilotQuery
 from app.models.pre_approval import PreApprovalComment, PreApprovalRequest
+from app.models.product import FinancialProduct
 from app.models.user import User
 from app.schemas.pre_approval import (
     CommentCreate, CommentOut, PreApprovalCreate,
@@ -24,6 +26,18 @@ _SEVERITY = {
     "PENDING": "INFO",
     "IN_REVIEW": "INFO",
 }
+_WORKFLOW_WRITER = require_roles(Role.ADMIN, Role.COMPLIANCE, Role.EMPLOYEE)
+_ALLOWED_TRANSITIONS = {
+    "PENDING": {"IN_REVIEW", "REJECTED", "CANCELLED"},
+    "IN_REVIEW": {
+        "APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED", "CANCELLED",
+    },
+    "APPROVED": set(),
+    "APPROVED_WITH_CONDITIONS": set(),
+    "REJECTED": set(),
+    "CANCELLED": set(),
+}
+_OPINION_REQUIRED = {"APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED"}
 
 
 def _scoped(db: Session, user: User):
@@ -63,10 +77,31 @@ def get_pre_approval(
 def create_pre_approval(
     payload: PreApprovalCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_WORKFLOW_WRITER),
 ):
-    initial_response = None
-    try:
+    source_query = None
+    product = None
+    if payload.source_query_id is not None:
+        source_query = db.get(CopilotQuery, payload.source_query_id)
+        if not source_query:
+            raise HTTPException(status_code=404, detail="Consulta do Copilot não encontrada")
+        if source_query.user_id != user.id:
+            raise HTTPException(status_code=403, detail="A consulta pertence a outro usuário")
+        if not source_query.answer:
+            raise HTTPException(status_code=409, detail="A consulta ainda não possui análise persistida")
+        if source_query.product_id is not None:
+            product = db.get(FinancialProduct, source_query.product_id)
+        initial_response = source_query.answer.answer
+        initial_decision = source_query.answer.decision
+        product_id = source_query.product_id
+        estimated_amount = source_query.amount
+        justification = payload.justification or source_query.objective
+    else:
+        product_id = payload.product_id
+        if product_id is not None:
+            product = db.get(FinancialProduct, product_id)
+            if not product:
+                raise HTTPException(status_code=404, detail="Produto não encontrado")
         from app.services.copilot import CopilotInput, run_query
         inp = CopilotInput(
             user_id=user.id,
@@ -79,13 +114,27 @@ def create_pre_approval(
         )
         result = run_query(inp, db)
         initial_response = result.answer
-    except Exception:
-        pass
+        initial_decision = result.decision
+        estimated_amount = payload.estimated_amount
+        justification = payload.justification
+
+    product_label = payload.product_label
+    if product:
+        product_label = product.name
+        if product.identifier:
+            product_label = f"{product.name} ({product.identifier})"
 
     req = PreApprovalRequest(
         requester_id=user.id,
+        source_query_id=source_query.id if source_query else None,
+        product_id=product_id,
+        product_label=product_label,
+        operation_type=payload.operation_type,
+        estimated_amount=estimated_amount,
+        intended_date=payload.intended_date,
+        justification=justification,
         copilot_initial_response=initial_response,
-        **payload.model_dump(),
+        copilot_initial_decision=initial_decision,
     )
     db.add(req)
     db.flush()
@@ -96,8 +145,10 @@ def create_pre_approval(
         entity="pre_approval_requests", entity_id=req.id,
         meta={
             "operation_type": payload.operation_type,
-            "product_label": payload.product_label,
-            "estimated_amount": payload.estimated_amount,
+            "product_label": product_label,
+            "estimated_amount": estimated_amount,
+            "source_query_id": source_query.id if source_query else None,
+            "copilot_initial_decision": initial_decision,
         },
     )
     db.commit()
@@ -110,30 +161,59 @@ def update_status(
     req_id: int,
     payload: PreApprovalStatusUpdate,
     db: Session = Depends(get_db),
-    actor: User = Depends(require_compliance),
+    actor: User = Depends(get_current_user),
 ):
     r = db.get(PreApprovalRequest, req_id)
     if not r:
         raise HTTPException(status_code=404, detail="Solicitação não encontrada")
-    if r.status in ("APPROVED", "REJECTED", "CANCELLED"):
+    actor_role = Role(actor.role)
+    target = payload.status.value
+    if actor_role == Role.AUDITOR:
+        raise HTTPException(status_code=403, detail="Auditor possui acesso somente leitura")
+    if actor_role == Role.EMPLOYEE:
+        if not (
+            r.requester_id == actor.id
+            and r.status == "PENDING"
+            and target == "CANCELLED"
+        ):
+            raise HTTPException(status_code=403, detail="Acesso negado")
+    elif actor_role not in (Role.ADMIN, Role.COMPLIANCE):
+        raise HTTPException(status_code=403, detail="Acesso negado")
+
+    if target not in _ALLOWED_TRANSITIONS.get(r.status, set()):
         raise HTTPException(
             status_code=400,
-            detail=f"Solicitação já encerrada com status {r.status}.",
+            detail=f"Transição inválida: {r.status} → {target}.",
         )
+    opinion = payload.compliance_opinion.strip() if payload.compliance_opinion else None
+    if target in _OPINION_REQUIRED and not opinion:
+        raise HTTPException(status_code=400, detail="Parecer de compliance obrigatório")
 
     old_status = r.status
-    r.status = payload.status.value
-    r.compliance_opinion = payload.compliance_opinion
+    r.status = target
+    r.compliance_opinion = opinion
     r.reviewer = actor.email
-    r.decided_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    if target == "IN_REVIEW":
+        r.review_started_at = now
+        event_type = "PRE_APPROVAL_REVIEW_STARTED"
+    elif target in _OPINION_REQUIRED:
+        r.decided_at = now
+        event_type = "PRE_APPROVAL_DECISION"
+    else:
+        event_type = "PRE_APPROVAL_CANCELLED"
 
     log_event(
-        db, "PRE_APPROVAL_DECISION",
-        f"Pré-aprovação #{req_id}: {old_status} → {payload.status.value} por {actor.email}",
+        db, event_type,
+        f"Pré-aprovação #{req_id}: {old_status} → {target} por {actor.email}",
         user_id=actor.id, actor_label=actor.email,
         entity="pre_approval_requests", entity_id=r.id,
-        severity=_SEVERITY.get(payload.status.value, "INFO"),
-        meta={"old_status": old_status, "new_status": payload.status.value},
+        severity=_SEVERITY.get(target, "INFO"),
+        meta={
+            "old_status": old_status,
+            "new_status": target,
+            "source_query_id": r.source_query_id,
+        },
     )
     db.commit()
     db.refresh(r)
@@ -145,7 +225,7 @@ def add_comment(
     req_id: int,
     payload: CommentCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_WORKFLOW_WRITER),
 ):
     r = db.get(PreApprovalRequest, req_id)
     if not r:

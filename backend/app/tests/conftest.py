@@ -5,7 +5,7 @@ The JSONB/ARRAY dialect differences don't affect the business logic tests here.
 """
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -38,6 +38,12 @@ def engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    @event.listens_for(eng, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     # import all models so metadata is populated
     import app.models.audit, app.models.copilot, app.models.document  # noqa: F401
     import app.models.pre_approval, app.models.product, app.models.restricted  # noqa: F401

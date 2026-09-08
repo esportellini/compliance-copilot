@@ -75,26 +75,40 @@ dashboard_router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    employee_scope = Role(user.role) == Role.EMPLOYEE
     base_q = db.query(CopilotQuery)
-    if Role(user.role) == Role.EMPLOYEE:
+    if employee_scope:
         base_q = base_q.filter(CopilotQuery.user_id == user.id)
     queries_month = base_q.filter(CopilotQuery.created_at >= month_start).count()
-    by_decision = {d: c for d, c in db.query(CopilotAnswer.decision, func.count())
-                   .join(CopilotQuery, CopilotAnswer.query_id == CopilotQuery.id)
-                   .filter(CopilotQuery.created_at >= month_start)
-                   .group_by(CopilotAnswer.decision).all()}
-    pending = db.query(PreApprovalRequest).filter(PreApprovalRequest.status.in_(["PENDING","IN_REVIEW"])).count()
+    decision_q = (db.query(CopilotAnswer.decision, func.count())
+                  .join(CopilotQuery, CopilotAnswer.query_id == CopilotQuery.id)
+                  .filter(CopilotQuery.created_at >= month_start))
+    pending_q = db.query(PreApprovalRequest).filter(
+        PreApprovalRequest.status.in_(["PENDING", "IN_REVIEW"])
+    )
+    if employee_scope:
+        decision_q = decision_q.filter(CopilotQuery.user_id == user.id)
+        pending_q = pending_q.filter(PreApprovalRequest.requester_id == user.id)
+    by_decision = {
+        decision: count
+        for decision, count in decision_q.group_by(CopilotAnswer.decision).all()
+    }
+    pending = pending_q.count()
     active_docs = db.query(PolicyDocument).filter(PolicyDocument.status == "ACTIVE").count()
     restricted = db.query(FinancialProduct).filter(FinancialProduct.status.in_(["RESTRICTED","BLOCKED"])).count()
-    daily = db.query(func.date_trunc("day", CopilotQuery.created_at).label("day"), func.count().label("count")) \
-              .filter(CopilotQuery.created_at >= now - timedelta(days=14)).group_by("day").order_by("day").all()
-    recent = db.query(CopilotQuery).filter(CopilotQuery.created_at >= month_start) \
-               .order_by(CopilotQuery.created_at.desc()).limit(5).all()
+    daily_q = (db.query(func.date(CopilotQuery.created_at).label("day"), func.count().label("count"))
+               .filter(CopilotQuery.created_at >= now - timedelta(days=14)))
+    recent_q = db.query(CopilotQuery).filter(CopilotQuery.created_at >= month_start)
+    if employee_scope:
+        daily_q = daily_q.filter(CopilotQuery.user_id == user.id)
+        recent_q = recent_q.filter(CopilotQuery.user_id == user.id)
+    daily = daily_q.group_by(func.date(CopilotQuery.created_at)).order_by("day").all()
+    recent = recent_q.order_by(CopilotQuery.created_at.desc()).limit(5).all()
     return {
         "queries_this_month": queries_month, "by_decision": by_decision,
         "pending_approvals": pending, "active_documents": active_docs,
         "restricted_products": restricted,
-        "queries_by_day": [{"date": str(r.day.date()), "count": r.count} for r in daily],
+        "queries_by_day": [{"date": str(r.day), "count": r.count} for r in daily],
         "recent_queries": [{"id": q.id, "question": q.question[:80],
                             "decision": q.answer.decision if q.answer else None,
                             "created_at": str(q.created_at)} for q in recent],

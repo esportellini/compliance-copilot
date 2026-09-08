@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { STATUS_CONFIG, type StatusKey } from "@/lib/pre-approvals";
@@ -20,7 +21,7 @@ export default function PreApprovalsPage() {
   const params = new URLSearchParams();
   if (statusF) params.set("status", statusF);
 
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, error } = useQuery({
     queryKey: ["pre-approvals", statusF],
     queryFn: () => api.get(`/pre-approvals?${params}`).then((r) => r.data),
   });
@@ -32,7 +33,7 @@ export default function PreApprovalsPage() {
       <PageHeader
         title="Pré-aprovações"
         subtitle={`${data.length} solicitaç${data.length !== 1 ? "ões" : "ão"}${pending ? ` · ${pending} pendente${pending !== 1 ? "s" : ""}` : ""}`}
-        action={<Link href="/pre-approvals/new" className="btn-primary text-sm">+ Nova solicitação</Link>}
+        action={user?.role !== "AUDITOR" ? <Link href="/pre-approvals/new" className="btn-primary text-sm">+ Nova solicitação</Link> : undefined}
       />
 
       <div className="flex gap-3 mb-6">
@@ -44,7 +45,11 @@ export default function PreApprovalsPage() {
         </select>
       </div>
 
-      {isLoading ? (
+      {error ? (
+        <Alert variant="error">
+          {(error as any).response?.data?.detail ?? "Não foi possível carregar as solicitações."}
+        </Alert>
+      ) : isLoading ? (
         <div className="flex justify-center py-20"><Spinner className="h-8 w-8" /></div>
       ) : data.length === 0 ? (
         <EmptyState message="Nenhuma solicitação encontrada." icon={<ClipboardCheck />} />

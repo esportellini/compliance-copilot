@@ -32,6 +32,8 @@ def test_compliance_can_update_status(client, employee_user, compliance_user):
     ch = auth_header(client, "compliance@test.local")
     r = client.post("/api/pre-approvals", json={"product_label": "X", "operation_type": "VENDA"}, headers=eh)
     req_id = r.json()["id"]
+    client.patch(f"/api/pre-approvals/{req_id}/status",
+                 json={"status": "IN_REVIEW"}, headers=ch)
     r2 = client.patch(f"/api/pre-approvals/{req_id}/status",
                       json={"status": "APPROVED", "compliance_opinion": "OK"}, headers=ch)
     assert r2.status_code == 200
@@ -61,7 +63,7 @@ def test_cannot_reopen_terminal_pre_approval(client, employee_user, compliance_u
     r = client.post("/api/pre-approvals", json={"product_label": "W", "operation_type": "COMPRA"}, headers=eh)
     req_id = r.json()["id"]
     client.patch(f"/api/pre-approvals/{req_id}/status",
-                 json={"status": "REJECTED"}, headers=ch)
+                 json={"status": "REJECTED", "compliance_opinion": "Negado."}, headers=ch)
     # try to re-open
     r3 = client.patch(f"/api/pre-approvals/{req_id}/status",
                       json={"status": "APPROVED"}, headers=ch)
