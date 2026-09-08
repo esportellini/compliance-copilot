@@ -35,18 +35,17 @@ Esta política estabelece as diretrizes para controle de conflitos de interesse 
 operações com valores mobiliários por parte dos colaboradores.
 
 2. FUNDOS ABERTOS
-Aplicações em fundos abertos disponíveis na plataforma são permitidas sem necessidade
-de aprovação prévia, desde que respeitados os limites individuais de concentração.
-Operações acima de R$ 100.000 devem ser reportadas ao compliance no dia seguinte.
+Aplicações de até R$ 100.000 em fundos abertos disponíveis na plataforma são
+permitidas sem aprovação prévia ou reporte. Operações acima de R$ 100.000 devem
+ser registradas no sistema de controles internos antes de sua execução.
 
-3. AÇÕES E DERIVATIVOS
-Qualquer operação com ações de companhias listadas ou derivativos sobre esses
-ativos exige aprovação prévia do compliance. A solicitação deve ser enviada com
-pelo menos dois dias úteis de antecedência.
+3. AÇÕES
+Qualquer operação com ações de companhias listadas exige aprovação prévia do
+compliance. A operação só pode ser realizada depois da aprovação.
 
 4. ATIVOS DIGITAIS (CRIPTOMOEDAS)
-Operações com criptomoedas são restritas para colaboradores, dada a elevada
-volatilidade e ausência de regulação específica aplicável à atividade da firma.
+Operações com criptomoedas são restritas para colaboradores e não devem ser
+executadas.
 
 5. LISTA RESTRITA
 A lista restrita é atualizada em tempo real pelo compliance. Nenhuma operação
@@ -56,9 +55,13 @@ pode ser realizada com ativos nela listados, independentemente do tipo ou valor.
 Toda solicitação de pré-aprovação deve conter: ativo, tipo de operação, volume
 estimado e justificativa de negócio. A decisão será comunicada em até 48 horas.
 
-7. REGISTRO E REPORTE
-Todas as operações realizadas por colaboradores devem ser reportadas ao sistema
-de controles internos no mesmo dia. A omissão é considerada falta grave.
+7. AUSÊNCIA DE POLÍTICA
+Produtos e operações sem regra aplicável devem ser encaminhados ao compliance.
+Nenhuma conclusão favorável deve ser presumida na ausência de política suficiente.
+
+8. AUDITORIA
+Consultas, decisões automáticas, solicitações e decisões de pré-aprovação são
+registradas para fins de auditoria.
 """
 
 
@@ -81,22 +84,42 @@ def seed(db: Session) -> None:
         {"name": "Fundo de Renda Fixa Beta", "product_type": "OPEN_FUND", "identifier": "FRFBT", "issuer": "Gestora Beta", "risk": "LOW", "status": "ALLOWED"},
         {"name": "Fundo FIP Gamma", "product_type": "CLOSED_FUND", "identifier": "FPGAM", "issuer": "Gestora Gamma", "risk": "HIGH", "status": "MONITORED"},
         {"name": "Ações XPTO3", "product_type": "STOCK", "identifier": "XPTO3", "issuer": "XPTO S.A.", "risk": "HIGH", "status": "ALLOWED"},
-        {"name": "CriptoNova", "product_type": "CRYPTO", "identifier": "CNOVA", "issuer": "CriptoNova Ltd.", "risk": "HIGH", "status": "RESTRICTED"},
-        {"name": "Lumen DeFi", "product_type": "CRYPTO", "identifier": "LMDFX", "issuer": "Lumen Protocol", "risk": "HIGH", "status": "RESTRICTED"},
+        {"name": "Ações ACME3", "product_type": "STOCK", "identifier": "ACME3", "issuer": "ACME S.A.", "risk": "HIGH", "status": "ALLOWED"},
+        {"name": "CriptoNova", "product_type": "CRYPTO", "identifier": "CNOVA", "issuer": "CriptoNova Ltd.", "risk": "HIGH", "status": "ALLOWED"},
+        {"name": "Lumen DeFi", "product_type": "CRYPTO", "identifier": "LMDFX", "issuer": "Lumen Protocol", "risk": "HIGH", "status": "ALLOWED"},
         {"name": "Debênture Ômega 2028", "product_type": "FIXED_INCOME", "identifier": "OMGDB28", "issuer": "Ômega S.A.", "risk": "LOW", "status": "ALLOWED"},
     ]
     for pd in products_data:
-        if not db.query(FinancialProduct).filter(FinancialProduct.identifier == pd["identifier"]).first():
+        product = db.query(FinancialProduct).filter(
+            FinancialProduct.identifier == pd["identifier"]
+        ).first()
+        if product:
+            for field, value in pd.items():
+                setattr(product, field, value)
+        else:
             db.add(FinancialProduct(**pd))
     db.flush()
 
     # ── restricted list ─────────────────────────────────────────────────
     restricted_items = [
-        {"identifier": "CNOVA", "name": "CriptoNova", "reason": "Ativo sem liquidez auditável"},
-        {"identifier": "LMDFX", "name": "Lumen DeFi", "reason": "Regulação pendente — vedado por política"},
+        {"identifier": "ACME3", "name": "Ações ACME3", "reason": "Período de silêncio do emissor"},
     ]
+    restricted_identifiers = {item["identifier"] for item in restricted_items}
+    for legacy_identifier in {"CNOVA", "LMDFX"}:
+        legacy = db.query(RestrictedListItem).filter(
+            RestrictedListItem.identifier == legacy_identifier
+        ).first()
+        if legacy and legacy_identifier not in restricted_identifiers:
+            legacy.active = False
     for ri in restricted_items:
-        if not db.query(RestrictedListItem).filter(RestrictedListItem.identifier == ri["identifier"]).first():
+        item = db.query(RestrictedListItem).filter(
+            RestrictedListItem.identifier == ri["identifier"]
+        ).first()
+        if item:
+            item.name = ri["name"]
+            item.reason = ri["reason"]
+            item.active = True
+        else:
             db.add(RestrictedListItem(**ri, active=True))
     db.flush()
 
@@ -109,20 +132,31 @@ def seed(db: Session) -> None:
          "risk": "MEDIUM", "priority": 5, "description": "Operações acima de R$100k devem ser reportadas."},
         {"name": "Ações exigem pré-aprovação", "product_type": "STOCK", "decision": "PRE_APPROVAL_REQUIRED",
          "risk": "MEDIUM", "priority": 10, "description": "Toda operação com ações requer pré-aprovação."},
-        {"name": "Derivativos restritos", "product_type": "DERIVATIVE", "decision": "RESTRICTED",
-         "risk": "HIGH", "priority": 5, "description": "Derivativos não permitidos para colaboradores."},
         {"name": "Criptoativos restritos", "product_type": "CRYPTO", "decision": "RESTRICTED",
-         "risk": "HIGH", "priority": 1, "description": "Criptoativos vedados pela política interna."},
-        {"name": "Renda fixa permitida", "product_type": "FIXED_INCOME", "decision": "ALLOWED",
-         "risk": "LOW", "priority": 10, "description": "Renda fixa pública e privada grau de investimento permitida."},
+         "risk": "HIGH", "priority": 10, "description": "Criptoativos vedados pela política interna."},
     ]
+    active_rule_names = {rule["name"] for rule in rules_data}
+    for legacy_name in {"Derivativos restritos", "Renda fixa permitida"}:
+        legacy = db.query(ComplianceRule).filter(ComplianceRule.name == legacy_name).first()
+        if legacy and legacy_name not in active_rule_names:
+            legacy.is_active = False
     for rd in rules_data:
-        if not db.query(ComplianceRule).filter(ComplianceRule.name == rd["name"]).first():
-            db.add(ComplianceRule(condition=rd.pop("condition", {}), is_active=True, **rd))
+        data = {**rd, "condition": rd.get("condition", {}), "is_active": True}
+        configured_rule = db.query(ComplianceRule).filter(
+            ComplianceRule.name == rd["name"]
+        ).first()
+        if configured_rule:
+            for field, value in data.items():
+                setattr(configured_rule, field, value)
+        else:
+            db.add(ComplianceRule(**data))
     db.flush()
 
     # ── policy document ──────────────────────────────────────────────────
-    if not db.query(PolicyDocument).filter(PolicyDocument.name == "Política de Investimentos v2.1").first():
+    doc = db.query(PolicyDocument).filter(
+        PolicyDocument.name == "Política de Investimentos v2.1"
+    ).first()
+    if not doc:
         doc = PolicyDocument(
             name="Política de Investimentos v2.1",
             doc_type="POLICY",
@@ -135,29 +169,48 @@ def seed(db: Session) -> None:
         )
         db.add(doc)
         db.flush()
-        from app.services.rag import index_document
-        index_document(doc, db)
+    else:
+        doc.doc_type = "POLICY"
+        doc.version = "2.1"
+        doc.owner = "compliance@demo.local"
+        doc.status = "ACTIVE"
+        doc.extracted_text = POLICY_TEXT
+        doc.processed_at = datetime.now(timezone.utc)
+    from app.services.rag import index_document
+    index_document(doc, db)
 
     # ── system settings ───────────────────────────────────────────────────
     settings_data = [
-        ("human_review_threshold",   "100000", "Valor (R$) acima do qual exige revisão humana"),
         ("data_retention_days",      "730",    "Dias de retenção de logs de auditoria (LGPD)"),
-        ("query_retention_days",     "730",    "Dias de retenção de consultas ao Copilot"),
-        ("ai_provider",              "mock",   "Provedor de IA: mock ou openai"),
-        ("ai_top_k_sources",         "4",      "Quantidade de chunks RAG por consulta"),
-        ("ai_min_score",             "0.0",    "Score mínimo de fonte (0.0–1.0)"),
-        ("ai_require_source",        "false",  "Exigir fonte para responder"),
-        ("require_human_high_risk",  "true",   "Revisão humana obrigatória para alto risco"),
-        ("restricted_list_active",   "true",   "Lista restrita ativa"),
-        ("session_expire_minutes",   "480",    "Minutos até o token JWT expirar"),
-        ("max_login_attempts",       "5",      "Tentativas máximas de login antes do bloqueio"),
-        ("min_password_length",      "8",      "Comprimento mínimo de senha"),
-        ("auto_anonymize_inactive",  "false",  "Anonimização automática de usuários inativos"),
-        ("allow_data_export",        "true",   "Exportação de dados habilitada (LGPD Art. 18)"),
-        ("app_name",                 "Compliance Copilot", "Nome exibido na interface"),
     ]
+    obsolete_setting_keys = {
+        "human_review_threshold",
+        "require_human_high_risk",
+        "ai_provider",
+        "ai_model",
+        "ai_top_k_sources",
+        "ai_min_score",
+        "ai_require_source",
+        "restricted_list_active",
+        "session_expire_minutes",
+        "max_login_attempts",
+        "min_password_length",
+        "query_retention_days",
+        "auto_anonymize_inactive",
+        "allow_data_export",
+        "app_name",
+    }
+    obsolete_settings = db.query(SystemSetting).filter(
+        SystemSetting.key.in_(obsolete_setting_keys)
+    ).all()
+    for obsolete_setting in obsolete_settings:
+        db.delete(obsolete_setting)
     for key, value, desc in settings_data:
-        if not db.query(SystemSetting).filter(SystemSetting.key == key).first():
+        setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+        if setting:
+            setting.value = value
+            setting.description = desc
+        else:
             db.add(SystemSetting(key=key, value=value, description=desc))
     db.flush()
 
@@ -179,13 +232,13 @@ def seed(db: Session) -> None:
              "Não insira: senhas, dados bancários, CPF de clientes, informações confidenciais de terceiros, detalhes de operações não autorizadas ou dados pessoais além do necessário para a consulta de compliance.",
              "PRIVACIDADE"),
         (6,  "Como interpretar as decisões",
-             "PERMITIDO: pode prosseguir. REQUER REPORTE: execute e registre no mesmo dia. REQUER PRÉ-APROVAÇÃO: aguarde aprovação antes de executar. RESTRITO: não execute em hipótese alguma. INCONCLUSIVO: consulte a equipe de compliance.",
+             "PERMITIDO: pode prosseguir. REQUER REPORTE: registre conforme exigido pela política antes de executar. REQUER PRÉ-APROVAÇÃO: aguarde aprovação antes de executar. RESTRITO: não execute em hipótese alguma. INCONCLUSIVO: consulte a equipe de compliance.",
              "COMPLIANCE"),
         (7,  "Quando abrir pré-aprovação",
-             "Abra uma pré-aprovação sempre que a resposta do Copilot for REQUER PRÉ-APROVAÇÃO, quando o valor superar o limite configurado, ou quando houver dúvida sobre a conformidade da operação.",
+             "Abra uma pré-aprovação quando a resposta do Copilot for REQUER PRÉ-APROVAÇÃO. Aguarde a decisão do compliance antes de executar a operação.",
              "COMPLIANCE"),
         (8,  "Quando solicitar revisão humana",
-             "Solicite revisão humana quando: a resposta for INCONCLUSIVO, o risco for ALTO, o valor for expressivo, ou quando a situação for incomum e não coberta pelas regras existentes.",
+             "Solicite revisão humana quando a resposta for INCONCLUSIVO ou REQUER PRÉ-APROVAÇÃO. RESTRITO significa não executar; REQUER REPORTE não depende de liberação humana.",
              "COMPLIANCE"),
         (9,  "Limitações da IA",
              "O Copilot não é um advogado nem um consultor financeiro. Ele aplica as regras internas configuradas pela equipe de compliance — não conhece legislação em tempo real, não interpreta contexto subjetivo e pode errar em situações não previstas nas regras.",
@@ -198,7 +251,13 @@ def seed(db: Session) -> None:
              "PRIVACIDADE"),
     ]
     for order, title, body, cat in training_data:
-        if not db.query(TrainingItem).filter(TrainingItem.title == title).first():
+        item = db.query(TrainingItem).filter(TrainingItem.title == title).first()
+        if item:
+            item.body = body
+            item.category = cat
+            item.order_index = order
+            item.required = True
+        else:
             db.add(TrainingItem(title=title, body=body, category=cat, order_index=order, required=True))
     db.flush()
 

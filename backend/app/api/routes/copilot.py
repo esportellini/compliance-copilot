@@ -140,6 +140,8 @@ def history_detail(
                     document_name=s.document_name,
                     excerpt=s.excerpt,
                     score=s.score,
+                    page_number=s.page_number,
+                    section_title=s.section_title,
                 )
                 for s in ans.sources
             ],

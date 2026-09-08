@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_compliance
@@ -10,6 +11,17 @@ from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
 from app.services.audit import log_event
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+
+def _flush_product(db: Session) -> None:
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Já existe produto com identifier equivalente.",
+        ) from exc
 
 
 @router.get("", response_model=list[ProductOut])
@@ -87,7 +99,7 @@ def create_product(
 ):
     p = FinancialProduct(**payload.model_dump())
     db.add(p)
-    db.flush()
+    _flush_product(db)
     log_event(
         db, "PRODUCT_CREATED", f"Produto criado: {p.name}",
         user_id=actor.id, actor_label=actor.email,
@@ -113,6 +125,7 @@ def update_product(
     changes = payload.model_dump(exclude_none=True)
     for k, v in changes.items():
         setattr(p, k, v)
+    _flush_product(db)
 
     # auditoria extra quando status muda para restrito/bloqueado
     new_status = changes.get("status", old_status)

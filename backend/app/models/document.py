@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -57,7 +57,9 @@ class DocumentChunk(Base, TimestampMixin):
     section_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     content: Mapped[str] = mapped_column(Text)
     # embedding como JSON list de floats; swap para pgvector.Vector em produção
-    embedding: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    embedding: Mapped[list | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=True
+    )
     char_count: Mapped[int] = mapped_column(Integer, default=0)
 
     document = relationship("PolicyDocument", back_populates="chunks")

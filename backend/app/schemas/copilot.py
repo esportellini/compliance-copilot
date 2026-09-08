@@ -20,6 +20,8 @@ class SourceOut(BaseModel):
     document_name: str
     excerpt: str
     score: float
+    page_number: int | None = None
+    section_title: str | None = None
 
     model_config = {"from_attributes": True}
 

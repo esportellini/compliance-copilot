@@ -28,7 +28,9 @@ O Compliance Copilot é uma ferramenta interna que:
 4. Usa IA apenas para redigir a justificativa em linguagem natural
 5. Registra tudo em trilha de auditoria imutável
 
-A IA nunca muda a decisão do motor de regras. Se não há fonte suficiente, retorna INCONCLUSIVO.
+**Rules decide. Retrieval provides evidence. AI explains.** Sem regra aplicável,
+o resultado é `INCONCLUSIVE`; a presença ou ausência de evidência RAG não altera
+uma decisão estruturada.
 
 ---
 
@@ -38,13 +40,13 @@ A IA nunca muda a decisão do motor de regras. Se não há fonte suficiente, ret
 |--------|----------------|
 | **Copilot** | Consultas em linguagem natural, decisão estruturada, fontes citadas |
 | **Motor de regras** | Regras configuráveis por tipo de produto, prioridade e condições |
-| **RAG** | Upload PDF/DOCX/TXT, chunking, embeddings, busca semântica + lexical |
+| **RAG** | Upload PDF/DOCX/TXT, chunking estruturado, BM25 offline e sinal semântico opcional |
 | **Pré-aprovações** | Fluxo de solicitação, análise, aprovação/rejeição com comentários |
 | **Auditoria** | Log append-only de todos os eventos, filtros, export CSV |
 | **Relatórios** | Dashboard, gráficos por decisão/risco, top produtos e regras |
 | **LGPD** | Exportação de dados, anonimização, política de retenção |
 | **Treinamentos** | Conteúdos de onboarding com checklist de aceite |
-| **Configurações** | Parâmetros de IA, compliance, segurança e LGPD por seção |
+| **Configurações** | Retenção de logs, único controle dinâmico com consumidor nesta versão |
 | **RBAC** | 4 perfis: Admin, Compliance, Colaborador, Auditor |
 
 ---
@@ -196,6 +198,11 @@ docker compose exec backend alembic revision --autogenerate -m "description"
 docker compose exec backend alembic upgrade head
 ```
 
+> A migration `0001_initial` foi substituída pelo schema atual porque este
+> projeto de portfólio não possui migrations publicadas nem bases reais que
+> dependam do rascunho anterior. Em sistemas já publicados, migrations iniciais
+> não devem ser reescritas; a evolução deve ocorrer por novas migrations.
+
 ---
 
 ## Fluxos principais
@@ -204,16 +211,15 @@ docker compose exec backend alembic upgrade head
 
 ```
 1. Usuário envia pergunta (+ produto/tipo/valor opcionais)
-2. Detecção de fora-de-escopo (regex sobre termos de compliance)
-3. Resolução do produto (por ID ou busca por nome)
-4. Verificação da lista restrita
-5. Motor de regras → decisão AUTORITATIVA
-6. RAG → chunks relevantes de documentos ativos
-7. Enforcement: sem fonte → INCONCLUSIVO
-8. Conflito documento vs decisão → INCONCLUSIVO
-9. AI Provider → justificativa em linguagem natural (não altera decisão)
-10. Persistência: query + answer + sources + audit log
-11. Resposta estruturada ao frontend
+2. Resolução do produto por ID, ticker exato ou nome exato normalizado
+3. Hard restriction do produto concreto → RESTRITO, mesmo com pergunta fora do escopo
+4. Sem hard restriction, detecção de fora-de-escopo
+5. ID inexistente ou resolução ambígua → INCONCLUSIVO, sem fallback por tipo
+6. Motor de regras → decisão AUTORITATIVA
+7. RAG → evidências relevantes de documentos ativos
+8. AI Provider → justificativa da decisão estruturada, com fallback seguro
+9. Persistência: query + answer + produto resolvido + sources + audit log
+10. Resposta estruturada ao frontend
 ```
 
 ### Fluxo do Motor de Regras
@@ -221,11 +227,27 @@ docker compose exec backend alembic upgrade head
 ```
 1. Lista restrita? → RESTRITO (terminal)
 2. Produto BLOCKED/RESTRICTED? → RESTRITO (terminal)
-3. Regras configuradas? → mais restritiva vence; conflito = INCONCLUSIVO
-4. Tipo de produto manual (CLOSED_FUND)? → INCONCLUSIVO
-5. Default por tipo (OPEN_FUND=PERMITIDO, STOCK=PRÉ-APROVAÇÃO, CRYPTO=RESTRITO)
-6. Nenhuma regra? → INCONCLUSIVO (nunca chuta)
+3. Filtra regras configuradas aplicáveis ao contexto
+4. Menor priority vence; regras de prioridades inferiores são ignoradas
+5. Decisões diferentes na prioridade vencedora → INCONCLUSIVO
+6. Nenhuma regra aplicável? → INCONCLUSIVO (nunca chuta)
 ```
+
+`requires_human_review` significa que a operação aguarda uma decisão humana. É
+verdadeiro somente para `PRE_APPROVAL_REQUIRED` e `INCONCLUSIVE`. Uma decisão
+`RESTRICTED` é terminal: a operação não deve ser executada nem encaminhada como
+pedido normal de liberação.
+
+### Cenários da demonstração
+
+| Cenário | Decisão |
+|---------|---------|
+| Fundo aberto até R$ 100.000 | `ALLOWED` |
+| Fundo aberto acima de R$ 100.000 | `REPORT_REQUIRED` |
+| Ação normal | `PRE_APPROVAL_REQUIRED` |
+| Ação ACME3 na lista restrita | `RESTRICTED` por `restricted_list` |
+| Criptoativo | `RESTRICTED` |
+| Produto sem regra aplicável | `INCONCLUSIVE` |
 
 ### Fluxo de Pré-aprovação
 
@@ -266,7 +288,8 @@ Cobertos: auth, JWT, RBAC por papel, motor de regras (10+ casos), Copilot (invar
 - Sem notificações por e-mail para pré-aprovações
 - Rate limiting não implementado (redis necessário para produção)
 - Extração de PDF depende de qualidade do texto selecionável (sem OCR)
-- Mock provider produz embeddings determinísticos mas não semânticos
+- Retrieval offline é lexical/BM25 e determinístico; o mock não produz embeddings
+- Embeddings OpenAI, quando configurados, apenas refinam candidatos lexicalmente relevantes
 
 ---
 

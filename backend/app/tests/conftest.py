@@ -17,7 +17,21 @@ from app.models.user import User
 SQLITE_URL = "sqlite:///:memory:"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(autouse=True)
+def reset_process_state():
+    from app.services import ai_provider
+
+    original_provider = ai_provider._instance
+    app.dependency_overrides.clear()
+    ai_provider._instance = None
+    try:
+        yield
+    finally:
+        app.dependency_overrides.clear()
+        ai_provider._instance = original_provider
+
+
+@pytest.fixture()
 def engine():
     eng = create_engine(
         SQLITE_URL,
@@ -30,10 +44,14 @@ def engine():
     import app.models.rule, app.models.setting, app.models.training, app.models.user  # noqa: F401
     from app.db.base import Base
     Base.metadata.create_all(bind=eng)
-    return eng
+    try:
+        yield eng
+    finally:
+        Base.metadata.drop_all(bind=eng)
+        eng.dispose()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def SessionTest(engine):
     return sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
@@ -51,9 +69,11 @@ def db(SessionTest):
 @pytest.fixture()
 def client(db):
     app.dependency_overrides[get_db] = lambda: db
-    with TestClient(app, raise_server_exceptions=True) as c:
-        yield c
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app, raise_server_exceptions=True) as c:
+            yield c
+    finally:
+        app.dependency_overrides.clear()
 
 
 # ── user fixtures ──────────────────────────────────────────────────────────────

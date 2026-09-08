@@ -42,7 +42,32 @@ def _extract_txt(raw: bytes) -> tuple[str, list[ExtractedPage]]:
     except UnicodeDecodeError:
         text = raw.decode("latin-1", errors="replace")
     text = text.strip()
-    return text, [ExtractedPage(text=text)]
+    if not text:
+        return text, []
+
+    # Plain-text policies in the demo use numbered, uppercase headings. Keeping
+    # them as section metadata gives TXT the same structural path as DOCX while
+    # avoiding guesses for ordinary prose.
+    heading = re.compile(r"^\s*\d+(?:\.\d+)*\.\s+[A-ZÀ-ÖØ-Þ0-9][A-ZÀ-ÖØ-Þ0-9 ()/\-–—]+\s*$")
+    sections: list[ExtractedPage] = []
+    current_title: str | None = None
+    current_lines: list[str] = []
+
+    def flush() -> None:
+        body = "\n".join(current_lines).strip()
+        if body:
+            sections.append(ExtractedPage(text=body, section_title=current_title))
+
+    for line in text.splitlines():
+        if heading.match(line):
+            flush()
+            current_title = line.strip()
+            current_lines = []
+        else:
+            current_lines.append(line)
+    flush()
+
+    return text, sections or [ExtractedPage(text=text)]
 
 
 def _extract_pdf(raw: bytes) -> tuple[str, list[ExtractedPage]]:

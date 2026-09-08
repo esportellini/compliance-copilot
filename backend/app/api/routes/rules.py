@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_compliance
+from app.core.identifiers import normalize_identifier, normalized_identifier_expression
 from app.db.session import get_db
 from app.models.product import FinancialProduct
 from app.models.rule import ComplianceRule
 from app.models.user import User
 from app.schemas.enums import Decision, RiskLevel
 from app.schemas.rule import RuleCreate, RuleEvaluateRequest, RuleOut, RuleUpdate
-from app.services.audit import get_setting, log_event
+from app.services.audit import log_event
 from app.services.rules_engine import EvaluationContext, RuleSpec, evaluate
 
 router = APIRouter(prefix="/rules", tags=["rules"])
@@ -21,7 +22,7 @@ def list_rules(db: Session = Depends(get_db), _: User = Depends(get_current_user
 
 @router.post("", response_model=RuleOut, status_code=201)
 def create_rule(payload: RuleCreate, db: Session = Depends(get_db), actor: User = Depends(require_compliance)):
-    r = ComplianceRule(**payload.model_dump())
+    r = ComplianceRule(**payload.model_dump(exclude_none=True))
     db.add(r)
     db.flush()
     log_event(db, "RULE_CREATED", f"Regra criada: {r.name}", user_id=actor.id, entity="compliance_rules", entity_id=r.id)
@@ -54,20 +55,30 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db), _: User = Depends(r
 
 @router.post("/evaluate")
 def evaluate_rule(payload: RuleEvaluateRequest, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    threshold = float(get_setting(db, "human_review_threshold") or "100000")
     product_status = "ALLOWED"
-    if payload.product_id:
-        p = db.get(FinancialProduct, payload.product_id)
-        if p:
-            product_status = p.status
-            if not payload.product_type:
-                payload.product_type = p.product_type
+    product = None
+    if payload.product_id is not None:
+        product = db.get(FinancialProduct, payload.product_id)
+        if product is None:
+            return {
+                "decision": Decision.INCONCLUSIVE,
+                "reason": f"Produto informado não encontrado: id={payload.product_id}.",
+                "matched_rules": [],
+                "risk_level": RiskLevel.MEDIUM,
+                "requires_human_review": True,
+            }
+        product_status = product.status
+        payload.product_type = product.product_type
     from app.models.restricted import RestrictedListItem
     on_restricted = False
-    if payload.product_type:
+    if product and product.identifier:
         on_restricted = bool(
             db.query(RestrictedListItem)
-            .filter(RestrictedListItem.active == True, RestrictedListItem.identifier.ilike(payload.product_type))  # noqa: E712
+            .filter(
+                RestrictedListItem.active == True,  # noqa: E712
+                normalized_identifier_expression(RestrictedListItem.identifier)
+                == normalize_identifier(product.identifier),
+            )
             .first()
         )
     rules_db = db.query(ComplianceRule).filter(ComplianceRule.is_active == True).all()  # noqa: E712
@@ -79,7 +90,6 @@ def evaluate_rule(payload: RuleEvaluateRequest, db: Session = Depends(get_db), _
         product_status=product_status,
         on_restricted_list=on_restricted,
         amount=payload.amount,
-        human_review_threshold=threshold,
     )
     result = evaluate(ctx, rules)
     return {"decision": result.decision, "reason": result.reason,

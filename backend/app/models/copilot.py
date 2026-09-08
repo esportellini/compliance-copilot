@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,7 +38,9 @@ class CopilotAnswer(Base, TimestampMixin):
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     next_action: Mapped[str | None] = mapped_column(Text, nullable=True)
     requires_human_review: Mapped[bool] = mapped_column(Boolean, default=False)
-    matched_rules: Mapped[list | None] = mapped_column(JSONB, default=list)
+    matched_rules: Mapped[list | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), default=list
+    )
 
     query = relationship("CopilotQuery", back_populates="answer")
     sources = relationship(
@@ -60,5 +62,7 @@ class SourceReference(Base, TimestampMixin):
     document_name: Mapped[str] = mapped_column(String(255))
     excerpt: Mapped[str] = mapped_column(Text)
     score: Mapped[float] = mapped_column(Float, default=0.0)
+    page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    section_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     answer = relationship("CopilotAnswer", back_populates="sources")

@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_compliance
 from app.db.session import get_db
-from app.models.document import PolicyDocument
+from app.models.document import DocumentChunk, PolicyDocument
 from app.models.user import User
 from app.schemas.document import ChunkOut, DocumentOut, DocumentUpdate
 from app.services.audit import log_event
-from app.services.extractor import extract_text
+from app.services.extractor import ExtractedPage, extract_text
 from app.services.rag import index_document, index_document_from_pages
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -100,6 +100,7 @@ async def upload_document(
     )
     db.add(doc)
     db.flush()
+    index_document_from_pages(doc, pages, db)
 
     log_event(
         db, "DOCUMENT_UPLOADED",
@@ -183,11 +184,25 @@ def process_document(
             detail="Defina versão e responsável antes de processar o documento.",
         )
 
-    # re-extrai com metadata usando o extractor (usa texto já extraído como TXT)
-    _, pages = extract_text(
-        d.extracted_text.encode("utf-8"),
-        d.original_filename or "documento.txt",
+    # Upload already indexed extractor output. Reuse those persisted chunks so
+    # processing never loses PDF pages or DOCX/TXT section titles.
+    existing_chunks = (
+        db.query(DocumentChunk)
+        .filter(DocumentChunk.document_id == d.id)
+        .order_by(DocumentChunk.chunk_index, DocumentChunk.id)
+        .all()
     )
+    if existing_chunks:
+        pages = [
+            ExtractedPage(
+                text=chunk.content,
+                page_number=chunk.page_number,
+                section_title=chunk.section_title,
+            )
+            for chunk in existing_chunks
+        ]
+    else:
+        _, pages = extract_text(d.extracted_text.encode("utf-8"), "documento.txt")
     n = index_document_from_pages(d, pages, db)
     d.status = "ACTIVE"
     d.processed_at = datetime.now(timezone.utc)

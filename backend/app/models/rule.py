@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,7 +12,9 @@ class ComplianceRule(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     product_type: Mapped[str | None] = mapped_column(String(48), nullable=True, index=True)
-    condition: Mapped[dict] = mapped_column(JSONB, default=dict)
+    condition: Mapped[dict] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), default=dict
+    )
     decision: Mapped[str] = mapped_column(String(32))
     risk: Mapped[str] = mapped_column(String(16), default="MEDIUM")
     priority: Mapped[int] = mapped_column(Integer, default=100)  # lower = evaluated first

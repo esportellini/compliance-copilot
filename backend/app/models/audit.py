@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,4 +19,6 @@ class AuditLog(Base, TimestampMixin):
     entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     severity: Mapped[str] = mapped_column(String(16), default="INFO", index=True)
     message: Mapped[str] = mapped_column(Text)
-    meta: Mapped[dict | None] = mapped_column(JSONB, default=dict)
+    meta: Mapped[dict | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), default=dict
+    )
