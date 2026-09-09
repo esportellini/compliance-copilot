@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { DecisionBadge } from "@/components/ui/DecisionBadge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { STATUS_CONFIG, type StatusKey } from "@/lib/pre-approvals";
 import { fmtCurrency, fmtDate, fmtDateTime } from "@/lib/utils";
@@ -32,6 +33,10 @@ type DecisionForm = z.infer<typeof decisionSchema>;
 
 const commentSchema = z.object({ body: z.string().trim().min(1, "Escreva um comentário") });
 type CommentForm = z.infer<typeof commentSchema>;
+
+function cleanCopilotSnapshot(value: string) {
+  return value.replace(/\*\*/g, "").replace(/⚠️\s*/g, "").trim();
+}
 
 // ─── timeline ─────────────────────────────────────────────────────────────────
 function Timeline({ request }: { request: any }) {
@@ -228,8 +233,8 @@ export default function PreApprovalDetailPage() {
             <p className="text-xs font-semibold text-blue-700">Análise inicial do Copilot</p>
             {req.source_query_id && <Link href={`/history/${req.source_query_id}`} className="text-xs text-brand-600 hover:underline">Consulta #{req.source_query_id}</Link>}
           </div>
-          {req.copilot_initial_decision && <p className="text-xs font-medium text-blue-700 mb-2">Decisão inicial: {req.copilot_initial_decision}</p>}
-          <p className="text-xs text-blue-800 whitespace-pre-wrap">{req.copilot_initial_response}</p>
+          {req.copilot_initial_decision && <div className="mb-3"><DecisionBadge decision={req.copilot_initial_decision} /></div>}
+          <p className="text-xs leading-6 text-blue-900 whitespace-pre-wrap">{cleanCopilotSnapshot(req.copilot_initial_response)}</p>
         </div>
       )}
 
