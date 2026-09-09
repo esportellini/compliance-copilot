@@ -60,6 +60,7 @@ def test_backend_development_requirements_include_test_runner():
 
     assert "-r requirements.txt" in requirements
     assert "pytest==" in requirements
+    assert "httpx==" in requirements
 
 
 def test_ci_runs_the_complete_backend_and_frontend_quality_gate():
