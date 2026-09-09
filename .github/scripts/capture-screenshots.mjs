@@ -75,11 +75,17 @@ await page.getByRole("button", { name: "Analisar operação" }).click();
 const result = page.locator('[aria-label="Resultado da análise"]');
 await result.waitFor();
 await page.getByText("Requer Pré-aprovação", { exact: true }).waitFor();
-await result.evaluate((element) => window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 82));
+await result.evaluate((element) => {
+  element.scrollIntoView({ block: "start" });
+  document.querySelector(".app-main")?.scrollBy(0, -24);
+});
 await screenshot(page, "copilot-pre-approval.png");
 
 await page.getByRole("heading", { name: "Evidências documentais" }).evaluate(
-  (element) => window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 480),
+  (element) => {
+    element.scrollIntoView({ block: "start" });
+    document.querySelector(".app-main")?.scrollBy(0, -160);
+  },
 );
 await screenshot(page, "copilot-evidence.png");
 
@@ -112,6 +118,7 @@ await screenshot(page, "pre-approval-detail.png");
 await login(page, "compliance@demo.local");
 await page.goto(`${appUrl}/dashboard`);
 await page.getByRole("heading", { name: "Distribuição das decisões" }).waitFor();
+await page.waitForTimeout(1200);
 await screenshot(page, "dashboard.png");
 
 await login(page, "auditor@demo.local");
