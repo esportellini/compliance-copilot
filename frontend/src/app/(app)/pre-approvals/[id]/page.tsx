@@ -14,6 +14,8 @@ import { Spinner } from "@/components/ui/Spinner";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DecisionBadge } from "@/components/ui/DecisionBadge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SlaBadge } from "@/components/ui/SlaBadge";
+import { ExportMenu } from "@/components/ExportMenu";
 import { STATUS_CONFIG, type StatusKey } from "@/lib/pre-approvals";
 import { fmtCurrency, fmtDate, fmtDateTime } from "@/lib/utils";
 import { Bot, CheckCircle2, ChevronLeft, MessageSquareText, Send, UserCheck } from "lucide-react";
@@ -148,11 +150,15 @@ export default function PreApprovalDetailPage() {
         }
       />
 
+      <div className="mb-5 flex justify-end"><ExportMenu requestId={id} /></div>
+
       <Timeline request={req} />
 
       {/* badge status */}
       <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3">
         <StatusBadge status={req.status} label={cfg.label} />
+        <SlaBadge status={req.sla_status} />
+        {req.due_at && <span className="text-xs text-slate-500">prazo {fmtDateTime(req.due_at)}</span>}
         {req.reviewer && (
           <span className="text-xs text-slate-500">por {req.reviewer}</span>
         )}

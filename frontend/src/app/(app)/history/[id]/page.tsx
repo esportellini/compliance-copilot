@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { DecisionBadge } from "@/components/ui/DecisionBadge";
 import { RiskBadge } from "@/components/ui/RiskBadge";
 import { SourceCard } from "@/components/ui/SourceCard";
+import { ProvenancePanel } from "@/components/ui/ProvenancePanel";
 import { DECISION_CONFIG, type DecisionKey } from "@/lib/copilot";
 import { fmtCurrency, fmtDateTime } from "@/lib/utils";
 import { ChevronLeft, AlertTriangle, ClipboardCheck } from "lucide-react";
@@ -102,6 +103,8 @@ export default function HistoryDetailPage() {
           </div>
         </div>
       </div>
+
+      <ProvenancePanel rules={ans.rule_provenance ?? []} />
 
       {/* fontes */}
       {ans.sources?.length > 0 && (

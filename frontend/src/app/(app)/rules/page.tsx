@@ -13,6 +13,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { VersionBadge } from "@/components/ui/VersionBadge";
 import { Scale, X, FlaskConical } from "lucide-react";
 
 // ─── constantes ────────────────────────────────────────────────────────────────
@@ -56,13 +57,16 @@ const RISK_LABELS: Record<string, string> = {
 // ─── schemas ───────────────────────────────────────────────────────────────────
 
 const ruleSchema = z.object({
+  rule_key: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use letras minúsculas, números e hífens").optional().or(z.literal("")),
   name: z.string().min(3, "Mínimo 3 caracteres"),
   description: z.string().optional(),
   product_type: z.string().optional(),
   decision: z.enum(DECISIONS),
   risk: z.enum(RISKS),
   priority: z.coerce.number().int().min(1).max(999),
-  is_active: z.boolean(),
+  status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
+  effective_from: z.string().optional(),
+  effective_to: z.string().optional(),
   condition_amount_gt: z.coerce.number().min(0).optional().or(z.literal("")),
 });
 type RuleForm = z.infer<typeof ruleSchema>;
@@ -85,12 +89,15 @@ function buildCondition(form: RuleForm): Record<string, unknown> {
 function formFromRule(r: any): RuleForm {
   return {
     name: r.name,
+    rule_key: r.rule_key,
     description: r.description ?? "",
     product_type: r.product_type ?? "",
     decision: r.decision,
     risk: r.risk,
     priority: r.priority,
-    is_active: r.is_active,
+    status: r.status,
+    effective_from: r.status === "DRAFT" ? r.effective_from?.slice(0, 16) ?? "" : "",
+    effective_to: r.status === "DRAFT" ? r.effective_to?.slice(0, 16) ?? "" : "",
     condition_amount_gt: r.condition?.amount_gt ?? "",
   };
 }
@@ -171,6 +178,10 @@ function RuleFormBody({
         <input {...register("name")} className="input" placeholder="Ex: Fundos abertos acima de R$ 100k" />
       </Field>
 
+      <Field label="Chave estável" error={errors.rule_key?.message} hint="Identifica todas as versões da mesma regra">
+        <input {...register("rule_key")} className="input font-mono" placeholder="ex: fundos-acima-100k" />
+      </Field>
+
       <Field label="Descrição" error={errors.description?.message}>
         <textarea {...register("description")} rows={2} className="input resize-none"
           placeholder="Contexto e motivação da regra" />
@@ -205,9 +216,9 @@ function RuleFormBody({
         </Field>
       </div>
 
-      <div className="flex items-center gap-2">
-        <input {...register("is_active")} type="checkbox" id="is_active" className="rounded border-slate-300" />
-        <label htmlFor="is_active" className="text-sm text-slate-700">Regra ativa</label>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Vigência inicial"><input {...register("effective_from")} type="datetime-local" className="input" /></Field>
+        <Field label="Vigência final" hint="Opcional"><input {...register("effective_to")} type="datetime-local" className="input" /></Field>
       </div>
 
       <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
@@ -242,7 +253,7 @@ export default function RulesPage() {
 
   const createForm = useForm<RuleForm>({
     resolver: zodResolver(ruleSchema),
-    defaultValues: { decision: "ALLOWED", risk: "MEDIUM", priority: 100, is_active: true },
+    defaultValues: { decision: "ALLOWED", risk: "MEDIUM", priority: 100, status: "DRAFT" },
   });
 
   const editForm = useForm<RuleForm>({ resolver: zodResolver(ruleSchema) });
@@ -252,22 +263,22 @@ export default function RulesPage() {
   // mutations
   const createMutation = useMutation({
     mutationFn: (d: RuleForm) =>
-      api.post("/rules", { ...d, product_type: d.product_type || null, condition: buildCondition(d) }),
+      api.post("/rules", { ...d, rule_key: d.rule_key || null, product_type: d.product_type || null, effective_from: d.effective_from || null, effective_to: d.effective_to || null, condition: buildCondition(d) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["rules"] }); setShowCreate(false); createForm.reset(); },
     onError: (e: any) => setError(e.response?.data?.detail ?? "Erro ao criar regra"),
   });
 
   const editMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: RuleForm }) =>
-      api.patch(`/rules/${id}`, { ...data, product_type: data.product_type || null, condition: buildCondition(data) }),
+      api.patch(`/rules/${id}`, { ...data, product_type: data.product_type || null, effective_from: data.effective_from || null, effective_to: data.effective_to || null, condition: buildCondition(data) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["rules"] }); setEditing(null); },
     onError: (e: any) => setError(e.response?.data?.detail ?? "Erro ao salvar regra"),
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
-      api.patch(`/rules/${id}`, { is_active }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rules"] }); setDeleteTarget(null); },
+  const activateMutation = useMutation({
+    mutationFn: (id: number) => api.post(`/rules/${id}/activate`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rules"] }),
+    onError: (e: any) => setError(e.response?.data?.detail ?? "Erro ao ativar regra"),
   });
 
   const deleteMutation = useMutation({
@@ -291,7 +302,7 @@ export default function RulesPage() {
     editForm.reset(formFromRule(r));
   };
 
-  const active = rules.filter((r: any) => r.is_active).length;
+  const active = rules.filter((r: any) => r.status === "ACTIVE").length;
 
   return (
     <div>
@@ -331,7 +342,8 @@ export default function RulesPage() {
             <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
               <tr>
                 <th className="px-4 py-3 text-left">Nome</th>
-                <th className="px-4 py-3 text-left">Tipo</th>
+                <th className="px-4 py-3 text-left">Versão</th>
+                <th className="px-4 py-3 text-left">Vigência</th>
                 <th className="px-4 py-3 text-left">Condição</th>
                 <th className="px-4 py-3 text-left">Decisão</th>
                 <th className="px-4 py-3 text-left">Risco</th>
@@ -342,12 +354,14 @@ export default function RulesPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rules.map((r: any) => (
-                <tr key={r.id} className={`transition-colors ${r.is_active ? "hover:bg-slate-50" : "opacity-40 bg-slate-50"}`}>
+                <tr key={r.id} className={`transition-colors ${r.status === "ARCHIVED" ? "bg-slate-50 text-slate-500" : "hover:bg-slate-50"}`}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-800">{r.name}</p>
+                    <p className="mt-0.5 font-mono text-[11px] text-slate-500">{r.rule_key}</p>
                     {r.description && <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{r.description}</p>}
                   </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs font-mono">{r.product_type ?? "—"}</td>
+                  <td className="px-4 py-3"><VersionBadge version={r.version} status={r.status} /></td>
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500">{new Date(r.effective_from).toLocaleDateString("pt-BR")}{r.effective_to ? ` — ${new Date(r.effective_to).toLocaleDateString("pt-BR")}` : " — aberta"}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs">
                     {r.condition?.amount_gt
                       ? `> R$ ${Number(r.condition.amount_gt).toLocaleString("pt-BR")}`
@@ -357,21 +371,7 @@ export default function RulesPage() {
                   <td className="px-4 py-3"><RiskBadge risk={r.risk} /></td>
                   <td className="px-4 py-3 text-right text-slate-500 tabular-nums">{r.priority}</td>
                   <td className="px-4 py-3">
-                    {canEdit ? (
-                      <button
-                        onClick={() => toggleMutation.mutate({ id: r.id, is_active: !r.is_active })}
-                        disabled={toggleMutation.isPending}
-                        className={`text-xs font-medium px-2 py-0.5 rounded-full transition-colors cursor-pointer
-                          ${r.is_active
-                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
-                        {r.is_active ? "Ativa" : "Inativa"}
-                      </button>
-                    ) : (
-                      <span className={`text-xs font-medium ${r.is_active ? "text-emerald-600" : "text-slate-400"}`}>
-                        {r.is_active ? "Ativa" : "Inativa"}
-                      </span>
-                    )}
+                    <span className="text-xs font-semibold text-slate-600">{r.status}</span>
                   </td>
                   {canEdit && (
                     <td className="px-4 py-3 text-right">
@@ -380,11 +380,12 @@ export default function RulesPage() {
                           className="text-xs text-brand-600 hover:underline">
                           Editar
                         </button>
-                        <button
+                        {r.status === "DRAFT" && <button onClick={() => activateMutation.mutate(r.id)} className="text-xs font-semibold text-emerald-700 hover:underline">Ativar</button>}
+                        {r.status === "DRAFT" && <button
                           onClick={() => setDeleteTarget(r)}
                           className="text-xs text-red-500 hover:underline">
                           Excluir
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   )}
@@ -411,7 +412,8 @@ export default function RulesPage() {
 
       {/* modal: editar */}
       {editing && (
-        <Modal title={`Editar — ${editing.name}`} onClose={() => { setEditing(null); setError(""); }} wide>
+        <Modal title={editing.status === "DRAFT" ? `Editar rascunho — ${editing.name}` : `Criar nova versão — ${editing.name}`} onClose={() => { setEditing(null); setError(""); }} wide>
+          {editing.status !== "DRAFT" && <Alert variant="info" className="mb-4">A versão publicada é imutável. Ao salvar, uma nova versão será criada e a anterior ficará arquivada.</Alert>}
           <RuleFormBody
             form={editForm}
             onSubmit={(d) => { setError(""); editMutation.mutate({ id: editing.id, data: d }); }}

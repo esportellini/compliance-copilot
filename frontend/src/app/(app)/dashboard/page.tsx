@@ -12,6 +12,7 @@ import { DecisionBadge } from "@/components/ui/DecisionBadge";
 import { Alert } from "@/components/ui/Alert";
 import { Panel, SectionHeader } from "@/components/ui/Panel";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { SlaBadge } from "@/components/ui/SlaBadge";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ export default function DashboardPage() {
 
       <section className="mb-7 grid border-y border-slate-200 bg-white sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo operacional">
         <Metric label="Consultas neste mês" value={data?.queries_this_month ?? 0} icon={<MessageSquareText size={16} />} />
-        <Metric label="Pré-aprovações pendentes" value={data?.pending_approvals ?? 0} icon={<ClipboardCheck size={16} />} attention={Boolean(data?.pending_approvals)} />
+        <Metric label="Pendentes / em revisão" value={`${data?.pending_count ?? 0} / ${data?.in_review_count ?? 0}`} icon={<ClipboardCheck size={16} />} attention={Boolean(data?.overdue_count)} />
         <Metric label="Documentos ativos" value={data?.active_documents ?? 0} icon={<FileCheck2 size={16} />} />
         <Metric label="Produtos restritos" value={data?.restricted_products ?? 0} icon={<ShieldAlert size={16} />} attention={Boolean(data?.restricted_products)} last />
       </section>
@@ -50,6 +51,9 @@ export default function DashboardPage() {
               <ClipboardCheck size={19} className="mt-0.5 shrink-0 text-amber-700" />
               <div><p className="text-sm font-semibold">{data?.pending_approvals ?? 0} solicitações pendentes</p><p className="mt-1 text-xs leading-5 text-amber-800">{canReview ? "Revise a fila e registre o próximo passo." : "Acompanhe o andamento das suas solicitações."}</p></div>
             </div>
+            <div className="mt-3 divide-y divide-slate-100">
+              {(data?.needs_attention ?? []).map((item: any) => <Link key={item.id} href={`/pre-approvals/${item.id}`} className="flex items-center gap-3 py-3 hover:text-brand-800"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.product_label ?? `Solicitação #${item.id}`}</p><p className="mt-0.5 text-xs text-slate-500">Prazo {fmtDate(item.due_at)}</p></div><SlaBadge status={item.sla_status} /></Link>)}
+            </div>
             <Link href="/pre-approvals" className="btn-secondary mt-auto w-full">Abrir fila<ArrowRight size={15} /></Link>
           </div>
         </Panel>
@@ -63,7 +67,7 @@ export default function DashboardPage() {
   );
 }
 
-function Metric({ label, value, icon, attention, last }: { label: string; value: number; icon: React.ReactNode; attention?: boolean; last?: boolean }) {
+function Metric({ label, value, icon, attention, last }: { label: string; value: number | string; icon: React.ReactNode; attention?: boolean; last?: boolean }) {
   return <div className={`px-5 py-5 sm:px-6 ${last ? "" : "border-b border-slate-200 sm:border-b-0 sm:border-r"}`}><div className="mb-3 flex items-center justify-between text-slate-500"><p className="text-[11px] font-semibold uppercase tracking-[0.08em]">{label}</p><span className={attention ? "text-amber-700" : "text-brand-700"}>{icon}</span></div><p className={`text-3xl font-semibold tabular-nums tracking-[-0.04em] ${attention ? "text-amber-800" : "text-slate-950"}`}>{value}</p></div>;
 }
 

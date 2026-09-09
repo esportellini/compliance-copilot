@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { RiskBadge } from "@/components/ui/RiskBadge";
 import { SkeletonRows } from "@/components/ui/Skeleton";
+import { CsvImportPreview } from "@/components/CsvImportPreview";
 import {
   PRODUCT_TYPES, PRODUCT_TYPE_MAP,
   STATUS_OPTIONS, STATUS_MAP,
@@ -56,6 +57,8 @@ export default function ProductsPage() {
           )
         }
       />
+
+      {canEdit && <CsvImportPreview />}
 
       {/* barra de filtros */}
       <div className="mb-5 flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">

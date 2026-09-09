@@ -4,6 +4,7 @@ export interface SourceCardProps {
   document_name: string;
   section_title?: string | null;
   page_number?: number | null;
+  document_version?: string | null;
   excerpt: string;
   score: number;
 }
@@ -16,10 +17,10 @@ export function SourceCard({ source }: { source: SourceCardProps }) {
           <FileText size={16} className="mt-0.5 shrink-0 text-brand-700" aria-hidden="true" />
           <div className="min-w-0">
             <h4 className="truncate text-sm font-semibold text-slate-900">{source.document_name}</h4>
-            {(source.section_title || source.page_number) && (
+            {(source.document_version || source.section_title || source.page_number) && (
               <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                 <BookOpenText size={12} aria-hidden="true" />
-                {[source.section_title, source.page_number ? `Página ${source.page_number}` : null].filter(Boolean).join(" · ")}
+                {[source.document_version ? `Versão ${source.document_version}` : null, source.section_title, source.page_number ? `Página ${source.page_number}` : null].filter(Boolean).join(" · ")}
               </p>
             )}
           </div>
