@@ -25,8 +25,8 @@ export default function NewProductPage() {
   });
 
   return (
-    <div className="max-w-3xl">
-      <PageHeader title="Novo produto" subtitle="Preencha os dados do produto financeiro" />
+    <div className="max-w-5xl">
+      <PageHeader eyebrow="Cadastro de produtos" title="Novo produto" subtitle="Registre a identidade, classificação e controles aplicáveis ao produto." />
       <div className="card p-6">
         <ProductForm
           submitLabel="Criar produto"

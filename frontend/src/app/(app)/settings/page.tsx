@@ -26,23 +26,26 @@ function SettingField({ setting, canEdit, onChange }: {
   };
 
   return (
-    <div className="flex items-start gap-4 py-3 border-b border-slate-50 last:border-0">
+    <div className="flex flex-col gap-3 border-b border-slate-100 py-4 last:border-0 sm:flex-row sm:items-start sm:gap-4">
       <div className="flex-1">
         <p className="text-sm font-medium text-slate-800">{setting.label}</p>
         {setting.description && (
           <p className="text-xs text-slate-400 mt-0.5">{setting.description}</p>
         )}
       </div>
-      <div className="shrink-0 w-48">
+      <div className="w-full shrink-0 sm:w-52">
         {!canEdit ? (
           <div className="px-3 py-2 bg-slate-50 rounded-lg text-sm text-slate-600 font-mono">
             {setting.type === "boolean"
-              ? (setting.value === "true" ? "✅ Ativo" : "❌ Inativo")
+              ? (setting.value === "true" ? "Ativo" : "Inativo")
               : setting.value || "—"}
           </div>
         ) : setting.type === "boolean" ? (
           <button
             onClick={() => handleChange(localVal === "true" ? "false" : "true")}
+            role="switch"
+            aria-checked={localVal === "true"}
+            aria-label={setting.label}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               localVal === "true" ? "bg-brand-500" : "bg-slate-200"
             }`}>
@@ -159,7 +162,7 @@ export default function SettingsPage() {
   const isAdmin = user?.role === "ADMIN";
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="max-w-5xl space-y-5">
       <PageHeader title="Configurações" subtitle="Parâmetros do sistema por seção" />
 
       {saved && <Alert variant="success">Configurações salvas com sucesso.</Alert>}

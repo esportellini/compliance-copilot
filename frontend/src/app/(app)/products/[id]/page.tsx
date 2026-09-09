@@ -9,45 +9,14 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
 import { DecisionBadge } from "@/components/ui/DecisionBadge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { RiskBadge } from "@/components/ui/RiskBadge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ProductForm } from "@/components/ProductForm";
 import type { ProductFormData } from "@/components/ProductForm";
-import {
-  PRODUCT_TYPE_MAP, STATUS_BADGE, STATUS_MAP, RISK_BADGE, RISK_MAP,
-} from "@/lib/products";
+import { PRODUCT_TYPE_MAP, STATUS_MAP } from "@/lib/products";
 import { fmtDateTime } from "@/lib/utils";
-import { Pencil, ShieldAlert, ShieldBan, ChevronLeft, X } from "lucide-react";
-
-// ─── modal de confirmação ──────────────────────────────────────────────────────
-function ConfirmModal({
-  title, body, confirmLabel, confirmClass, onConfirm, onClose, isPending,
-}: {
-  title: string; body: string; confirmLabel: string; confirmClass: string;
-  onConfirm: () => void; onClose: () => void; isPending: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
-        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 ml-4">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-slate-600">{body}</p>
-          <div className="flex justify-end gap-3 mt-6">
-            <button onClick={onClose} className="btn-ghost text-sm">Cancelar</button>
-            <button onClick={onConfirm} disabled={isPending}
-              className={`text-sm font-medium px-4 py-2 rounded-lg text-white transition-colors flex items-center gap-2 ${confirmClass}`}>
-              {isPending && <Spinner className="h-4 w-4 border-white border-t-transparent" />}
-              {confirmLabel}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { Pencil, ShieldAlert, ShieldBan, ChevronLeft } from "lucide-react";
 
 // ─── linha de detalhe ──────────────────────────────────────────────────────────
 function DetailRow({ label, value }: { label: string; value?: string | null }) {
@@ -112,11 +81,8 @@ export default function ProductDetailPage() {
   );
   if (!product) return <Alert variant="error">Produto não encontrado.</Alert>;
 
-  const statusBadge = STATUS_BADGE[product.status] ?? "bg-slate-100 text-slate-600";
-  const riskBadge   = product.risk ? (RISK_BADGE[product.risk] ?? "bg-slate-100 text-slate-500") : null;
-
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       {/* cabeçalho */}
       <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
         <Link href="/products" className="hover:text-brand-600 flex items-center gap-1">
@@ -155,14 +121,8 @@ export default function ProductDetailPage() {
 
       {/* badges de status */}
       <div className="flex items-center gap-2 mb-6">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusBadge}`}>
-          {STATUS_MAP[product.status] ?? product.status}
-        </span>
-        {riskBadge && (
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${riskBadge}`}>
-            Risco {RISK_MAP[product.risk]}
-          </span>
-        )}
+        <StatusBadge status={product.status} label={STATUS_MAP[product.status] ?? product.status} />
+        {product.risk && <RiskBadge risk={product.risk} />}
         {product.tags?.map((t: string) => (
           <span key={t} className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">
             {t}
@@ -252,30 +212,10 @@ export default function ProductDetailPage() {
       </div>
 
       {/* modal: restringir */}
-      {confirm === "restrict" && (
-        <ConfirmModal
-          title="Marcar como restrito"
-          body={`Tem certeza que deseja marcar "${product.name}" como RESTRITO? Colaboradores não poderão operar este produto sem pré-aprovação. Esta ação gera registro de auditoria.`}
-          confirmLabel="Restringir"
-          confirmClass="bg-amber-500 hover:bg-amber-600"
-          onConfirm={() => restrictMutation.mutate()}
-          onClose={() => setConfirm(null)}
-          isPending={restrictMutation.isPending}
-        />
-      )}
+      <ConfirmDialog open={confirm === "restrict"} title="Marcar produto como restrito" description={`“${product.name}” será incluído na lista de restrição. Operações com este produto não devem ser executadas. A alteração ficará registrada na trilha de auditoria.`} confirmLabel="Restringir produto" destructive busy={restrictMutation.isPending} onConfirm={() => restrictMutation.mutate()} onClose={() => setConfirm(null)} />
 
       {/* modal: bloquear */}
-      {confirm === "block" && (
-        <ConfirmModal
-          title="Bloquear produto"
-          body={`Tem certeza que deseja BLOQUEAR "${product.name}"? Nenhuma operação será permitida. Esta ação gera registro de auditoria e não pode ser revertida sem revisão manual.`}
-          confirmLabel="Bloquear"
-          confirmClass="bg-red-600 hover:bg-red-700"
-          onConfirm={() => blockMutation.mutate()}
-          onClose={() => setConfirm(null)}
-          isPending={blockMutation.isPending}
-        />
-      )}
+      <ConfirmDialog open={confirm === "block"} title="Bloquear produto" description={`Nenhuma operação com “${product.name}” será permitida. A alteração ficará registrada na trilha de auditoria e exige revisão manual para ser revertida.`} confirmLabel="Bloquear produto" destructive busy={blockMutation.isPending} onConfirm={() => blockMutation.mutate()} onClose={() => setConfirm(null)} />
     </div>
   );
 }

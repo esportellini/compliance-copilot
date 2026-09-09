@@ -10,6 +10,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import { ROLE_LABELS } from "@/lib/utils";
 import { Users, X } from "lucide-react";
 
@@ -32,10 +35,10 @@ const editSchema = z.object({
 type EditForm = z.infer<typeof editSchema>;
 
 const ROLE_BADGE: Record<string, string> = {
-  ADMIN: "bg-purple-100 text-purple-700",
-  COMPLIANCE: "bg-blue-100 text-blue-700",
-  EMPLOYEE: "bg-slate-100 text-slate-600",
-  AUDITOR: "bg-amber-100 text-amber-700",
+  ADMIN: "bg-slate-900 text-white ring-slate-900/20",
+  COMPLIANCE: "bg-brand-50 text-brand-800 ring-brand-700/20",
+  EMPLOYEE: "bg-slate-100 text-slate-700 ring-slate-500/20",
+  AUDITOR: "bg-amber-50 text-amber-900 ring-amber-700/20",
 };
 
 export default function UsersPage() {
@@ -44,6 +47,7 @@ export default function UsersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [error, setError] = useState("");
+  const [deactivateTarget, setDeactivateTarget] = useState<any>(null);
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["users"],
@@ -74,7 +78,7 @@ export default function UsersPage() {
 
   const deactivateMutation = useMutation({
     mutationFn: (id: number) => api.patch(`/users/${id}/deactivate`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["users"] }); setDeactivateTarget(null); },
     onError: (e: any) => setError(e.response?.data?.detail ?? "Erro ao desativar usuário"),
   });
 
@@ -100,11 +104,11 @@ export default function UsersPage() {
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
       {isLoading ? (
-        <div className="flex justify-center py-16"><Spinner className="h-8 w-8" /></div>
+        <div className="card p-4"><SkeletonRows rows={7} /></div>
       ) : data.length === 0 ? (
         <EmptyState message="Nenhum usuário cadastrado." icon={<Users />} />
       ) : (
-        <div className="card">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
               <tr>
@@ -127,15 +131,13 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-500">{u.email}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] ?? "bg-slate-100 text-slate-600"}`}>
+                    <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${ROLE_BADGE[u.role] ?? "bg-slate-100 text-slate-600"}`}>
                       {ROLE_LABELS[u.role] ?? u.role}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-500">{u.department ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium ${u.is_active ? "text-emerald-600" : "text-slate-400"}`}>
-                      {u.is_active ? "Ativo" : "Inativo"}
-                    </span>
+                    <StatusBadge status={u.is_active ? "ACTIVE" : "INACTIVE"} />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
@@ -145,7 +147,7 @@ export default function UsersPage() {
                       </button>
                       {u.is_active && u.id !== me?.id && (
                         <button
-                          onClick={() => { setError(""); deactivateMutation.mutate(u.id); }}
+                          onClick={() => { setError(""); setDeactivateTarget(u); }}
                           className="text-xs text-red-500 hover:underline"
                           disabled={deactivateMutation.isPending}>
                           Desativar
@@ -225,17 +227,18 @@ export default function UsersPage() {
           </form>
         </Modal>
       )}
+      <ConfirmDialog open={Boolean(deactivateTarget)} title="Desativar usuário" description={`“${deactivateTarget?.full_name ?? ""}” perderá acesso ao sistema. Os registros já existentes serão preservados para auditoria.`} confirmLabel="Desativar usuário" destructive busy={deactivateMutation.isPending} onClose={() => setDeactivateTarget(null)} onConfirm={() => deactivateTarget && deactivateMutation.mutate(deactivateTarget.id)} />
     </div>
   );
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+    <div className="modal-backdrop">
+      <div className="modal-panel max-w-md" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+          <h2 id="user-modal-title" className="font-semibold text-slate-950">{title}</h2>
+          <button onClick={onClose} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Fechar">
             <X size={18} />
           </button>
         </div>
@@ -247,10 +250,10 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="label">{label}</label>
+    <label className="block">
+      <span className="label">{label}</span>
       {children}
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
-    </div>
+    </label>
   );
 }

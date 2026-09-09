@@ -9,36 +9,11 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
 import { DecisionBadge } from "@/components/ui/DecisionBadge";
-import { DOC_TYPE_MAP, STATUS_BADGE, STATUS_MAP, fmtSize } from "@/lib/documents";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DOC_TYPE_MAP, STATUS_MAP, fmtSize } from "@/lib/documents";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { ChevronLeft, RefreshCw, Archive, Play, X } from "lucide-react";
-
-function ConfirmModal({ title, body, confirmLabel, confirmClass, onConfirm, onClose, isPending }: {
-  title: string; body: string; confirmLabel: string; confirmClass: string;
-  onConfirm: () => void; onClose: () => void; isPending: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
-        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 ml-4"><X size={18} /></button>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-slate-600">{body}</p>
-          <div className="flex justify-end gap-3 mt-6">
-            <button onClick={onClose} className="btn-ghost text-sm">Cancelar</button>
-            <button onClick={onConfirm} disabled={isPending}
-              className={`text-sm font-medium px-4 py-2 rounded-lg text-white transition-colors flex items-center gap-2 ${confirmClass}`}>
-              {isPending && <Spinner className="h-4 w-4 border-white border-t-transparent" />}
-              {confirmLabel}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { ChevronLeft, RefreshCw, Archive, Play } from "lucide-react";
 
 function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === "") return null;
@@ -70,17 +45,6 @@ export default function DocumentDetailPage() {
     enabled: !!id,
   });
 
-  const { data: queries = [] } = useQuery({
-    queryKey: ["document-queries", id],
-    queryFn: async () => {
-      // busca consultas que referenciam este documento via source_references
-      // endpoint simplificado: filtra histórico pelo doc id
-      const all = await api.get("/copilot/history").then((r) => r.data);
-      return all.slice(0, 5); // placeholder — mostra recentes
-    },
-    enabled: !!id,
-  });
-
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["document", id] });
     qc.invalidateQueries({ queryKey: ["document-chunks", id] });
@@ -107,10 +71,8 @@ export default function DocumentDetailPage() {
   const isDraft     = doc.status === "DRAFT";
   const canActivate = !isArchived && doc.version && doc.owner;
 
-  const statusBadge = STATUS_BADGE[doc.status] ?? "bg-slate-100 text-slate-600";
-
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
         <Link href="/documents" className="hover:text-brand-600 flex items-center gap-1">
           <ChevronLeft size={14} /> Documentos
@@ -148,9 +110,7 @@ export default function DocumentDetailPage() {
 
       {/* badges */}
       <div className="flex items-center gap-2 mb-6 flex-wrap">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusBadge}`}>
-          {STATUS_MAP[doc.status] ?? doc.status}
-        </span>
+        <StatusBadge status={doc.status} label={STATUS_MAP[doc.status] ?? doc.status} />
         {doc.version && (
           <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-mono">
             v{doc.version}
@@ -221,51 +181,10 @@ export default function DocumentDetailPage() {
         )}
       </div>
 
-      {/* consultas recentes (placeholder) */}
-      <div className="card">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-700">Consultas que citaram este documento</h2>
-        </div>
-        <p className="px-5 py-8 text-sm text-slate-400 text-center">
-          As consultas que citam este documento aparecem no histórico do Copilot.{" "}
-          <Link href="/history" className="text-brand-600 hover:underline">Ver histórico</Link>
-        </p>
-      </div>
-
       {/* modais de confirmação */}
-      {confirm === "process" && (
-        <ConfirmModal
-          title="Processar documento"
-          body={`Isso irá extrair o texto, gerar chunks e ativar "${doc.name}" como fonte para o Copilot. Confirmar?`}
-          confirmLabel="Processar"
-          confirmClass="bg-brand-500 hover:bg-brand-600"
-          onConfirm={() => processMutation.mutate()}
-          onClose={() => setConfirm(null)}
-          isPending={processMutation.isPending}
-        />
-      )}
-      {confirm === "reprocess" && (
-        <ConfirmModal
-          title="Reprocessar documento"
-          body={`Os chunks atuais serão descartados e gerados novamente a partir do texto extraído. Continuar?`}
-          confirmLabel="Reprocessar"
-          confirmClass="bg-brand-500 hover:bg-brand-600"
-          onConfirm={() => processMutation.mutate()}
-          onClose={() => setConfirm(null)}
-          isPending={processMutation.isPending}
-        />
-      )}
-      {confirm === "archive" && (
-        <ConfirmModal
-          title="Arquivar documento"
-          body={`"${doc.name}" será marcado como arquivado e não será usado como fonte principal pelo Copilot. Esta ação gera registro de auditoria.`}
-          confirmLabel="Arquivar"
-          confirmClass="bg-amber-500 hover:bg-amber-600"
-          onConfirm={() => archiveMutation.mutate()}
-          onClose={() => setConfirm(null)}
-          isPending={archiveMutation.isPending}
-        />
-      )}
+      <ConfirmDialog open={confirm === "process"} title="Processar documento" description={`O texto de “${doc.name}” será extraído e indexado como evidência documental.`} confirmLabel="Processar" busy={processMutation.isPending} onConfirm={() => processMutation.mutate()} onClose={() => setConfirm(null)} />
+      <ConfirmDialog open={confirm === "reprocess"} title="Reprocessar documento" description="Os chunks atuais serão substituídos por uma nova extração e indexação do documento." confirmLabel="Reprocessar" busy={processMutation.isPending} onConfirm={() => processMutation.mutate()} onClose={() => setConfirm(null)} />
+      <ConfirmDialog open={confirm === "archive"} title="Arquivar documento" description={`“${doc.name}” deixará de ser usado como fonte principal de evidência. A alteração ficará registrada na trilha de auditoria.`} confirmLabel="Arquivar documento" destructive busy={archiveMutation.isPending} onConfirm={() => archiveMutation.mutate()} onClose={() => setConfirm(null)} />
     </div>
   );
 }

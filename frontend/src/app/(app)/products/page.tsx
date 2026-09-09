@@ -7,10 +7,13 @@ import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { RiskBadge } from "@/components/ui/RiskBadge";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import {
   PRODUCT_TYPES, PRODUCT_TYPE_MAP,
-  STATUS_OPTIONS, STATUS_BADGE, STATUS_MAP,
-  RISK_OPTIONS, RISK_BADGE, RISK_MAP,
+  STATUS_OPTIONS, STATUS_MAP,
+  RISK_OPTIONS,
 } from "@/lib/products";
 import { Package, Search, X } from "lucide-react";
 
@@ -55,7 +58,7 @@ export default function ProductsPage() {
       />
 
       {/* barra de filtros */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="mb-5 flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
         <div className="relative flex-1 min-w-48">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -96,14 +99,14 @@ export default function ProductsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Spinner className="h-8 w-8" /></div>
+        <div className="card p-4"><SkeletonRows rows={7} /></div>
       ) : products.length === 0 ? (
         <EmptyState
           message={hasFilters ? "Nenhum produto corresponde aos filtros." : "Nenhum produto cadastrado."}
           icon={<Package />}
         />
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
               <tr>
@@ -142,15 +145,11 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-500">{p.issuer ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[p.status] ?? "bg-slate-100 text-slate-600"}`}>
-                      {STATUS_MAP[p.status] ?? p.status}
-                    </span>
+                    <StatusBadge status={p.status} label={STATUS_MAP[p.status] ?? p.status} />
                   </td>
                   <td className="px-4 py-3">
                     {p.risk ? (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${RISK_BADGE[p.risk] ?? "bg-slate-100 text-slate-500"}`}>
-                        {RISK_MAP[p.risk] ?? p.risk}
-                      </span>
+                      <RiskBadge risk={p.risk} />
                     ) : "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-500 text-xs">{p.liquidity ?? "—"}</td>

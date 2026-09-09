@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Shield, Download, UserX, Trash2, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
 
 function Section({ title, icon, children, defaultOpen = false }: {
@@ -36,6 +37,7 @@ export default function PrivacyPage() {
   const [exportError, setExportErr] = useState("");
   const [actionMsg, setActionMsg]   = useState("");
   const [actionError, setActionErr] = useState("");
+  const [pendingAction, setPendingAction] = useState<"anonymize" | "retention" | null>(null);
 
   const { data: info, isLoading } = useQuery({
     queryKey: ["privacy-info"],
@@ -50,20 +52,20 @@ export default function PrivacyPage() {
 
   const anonymizeMutation = useMutation({
     mutationFn: () => api.post(`/privacy/anonymize-user/${userId}`),
-    onSuccess: () => { setActionMsg("Usuário anonimizado com sucesso."); setActionErr(""); },
+    onSuccess: () => { setActionMsg("Usuário anonimizado com sucesso."); setActionErr(""); setPendingAction(null); },
     onError: (e: any) => setActionErr(e.response?.data?.detail ?? "Erro ao anonimizar"),
   });
 
   const retentionMutation = useMutation({
     mutationFn: () => api.post("/privacy/run-retention-policy").then(r => r.data),
-    onSuccess: d => setActionMsg(`Política executada. ${d.deleted_audit_logs} logs removidos (cutoff: ${d.cutoff_date}).`),
+    onSuccess: d => { setActionMsg(`Política executada. ${d.deleted_audit_logs} logs removidos (cutoff: ${d.cutoff_date}).`); setPendingAction(null); },
     onError: (e: any) => setActionErr(e.response?.data?.detail ?? "Erro"),
   });
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner className="h-8 w-8" /></div>;
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="max-w-5xl space-y-5">
       <PageHeader title="Privacidade e LGPD"
         subtitle="Lei Geral de Proteção de Dados — Lei 13.709/2018" />
 
@@ -127,9 +129,9 @@ export default function PrivacyPage() {
             <p className="text-sm text-slate-500 mb-4">
               Exporta todos os dados vinculados a um usuário. Requer ID numérico do usuário.
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <input value={userId} onChange={e => setUserId(e.target.value)}
-                className="input w-40" placeholder="ID do usuário" type="number" />
+                className="input w-full sm:w-44" placeholder="ID do usuário" type="number" />
               <button onClick={() => { setExportErr(""); exportMutation.mutate(); }}
                 disabled={!userId || exportMutation.isPending}
                 className="btn-primary text-sm flex items-center gap-2">
@@ -140,7 +142,7 @@ export default function PrivacyPage() {
             {exportError && <Alert variant="error" className="mt-3">{exportError}</Alert>}
             {exportData && (
               <div className="mt-4 space-y-2">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {[
                     ["Consultas", exportData.totais.consultas],
                     ["Pré-aprovações", exportData.totais.pre_aprovacoes],
@@ -169,16 +171,15 @@ export default function PrivacyPage() {
               A anonimização é irreversível. O usuário deve estar desativado antes de ser anonimizado.
               Logs de auditoria com fins regulatórios são preservados sem dados pessoais.
             </Alert>
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <input value={userId} onChange={e => setUserId(e.target.value)}
-                className="input w-40" placeholder="ID do usuário" type="number" />
+                className="input w-full sm:w-44" placeholder="ID do usuário" type="number" />
               <button
                 onClick={() => {
-                  if (!confirm(`Anonimizar usuário ${userId}? Esta ação é irreversível.`)) return;
-                  setActionErr(""); setActionMsg(""); anonymizeMutation.mutate();
+                  setActionErr(""); setActionMsg(""); setPendingAction("anonymize");
                 }}
                 disabled={!userId || anonymizeMutation.isPending}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
+                className="btn-secondary text-sm flex items-center gap-2">
                 {anonymizeMutation.isPending && <Spinner className="h-4 w-4 border-white border-t-transparent" />}
                 Anonimizar
               </button>
@@ -193,11 +194,10 @@ export default function PrivacyPage() {
               Eventos de anonimização, bloqueio e decisões de pré-aprovação são preservados.
             </p>
             <button onClick={() => {
-              if (!confirm("Executar política de retenção? Logs antigos serão removidos.")) return;
-              setActionErr(""); setActionMsg(""); retentionMutation.mutate();
+              setActionErr(""); setActionMsg(""); setPendingAction("retention");
             }}
               disabled={retentionMutation.isPending}
-              className="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
+              className="btn-destructive text-sm flex items-center gap-2">
               {retentionMutation.isPending && <Spinner className="h-4 w-4 border-white border-t-transparent" />}
               Executar política de retenção
             </button>
@@ -212,6 +212,27 @@ export default function PrivacyPage() {
           Para solicitar exportação ou anonimização dos seus dados, entre em contato com o administrador do sistema.
         </Alert>
       )}
+
+      <ConfirmDialog
+        open={pendingAction === "anonymize"}
+        title={`Anonimizar usuário ${userId}`}
+        description="Esta ação é irreversível. Os dados pessoais serão anonimizados e os registros regulatórios necessários serão preservados."
+        confirmLabel="Anonimizar usuário"
+        destructive
+        busy={anonymizeMutation.isPending}
+        onClose={() => setPendingAction(null)}
+        onConfirm={() => anonymizeMutation.mutate()}
+      />
+      <ConfirmDialog
+        open={pendingAction === "retention"}
+        title="Executar política de retenção"
+        description="Logs antigos abrangidos pela política serão removidos. Eventos regulatórios preservados pela política não serão afetados."
+        confirmLabel="Executar política"
+        destructive
+        busy={retentionMutation.isPending}
+        onClose={() => setPendingAction(null)}
+        onConfirm={() => retentionMutation.mutate()}
+      />
     </div>
   );
 }

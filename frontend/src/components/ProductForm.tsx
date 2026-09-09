@@ -38,12 +38,12 @@ function Field({ label, hint, error, children }: {
   label: string; hint?: string; error?: string; children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="label">{label}</label>
+    <label className="block">
+      <span className="label">{label}</span>
       {children}
       {hint && !error && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
-    </div>
+    </label>
   );
 }
 
@@ -65,7 +65,7 @@ export function ProductForm({ defaultValues, onSubmit, onCancel, isPending, erro
       {error && <Alert variant="error">{error}</Alert>}
 
       {/* linha 1 */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Nome *" error={errors.name?.message}>
           <input {...register("name")} className="input" placeholder="Ex: Fundo Multimercado Alfa" />
         </Field>
@@ -80,7 +80,7 @@ export function ProductForm({ defaultValues, onSubmit, onCancel, isPending, erro
       </div>
 
       {/* linha 2 */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Ticker / CNPJ" error={errors.identifier?.message}>
           <input {...register("identifier")} className="input" placeholder="Ex: ALFA11 ou 00.000.000/0001-00" />
         </Field>
@@ -102,7 +102,7 @@ export function ProductForm({ defaultValues, onSubmit, onCancel, isPending, erro
       </div>
 
       {/* linha 3 */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Emissor">
           <input {...register("issuer")} className="input" placeholder="Ex: Banco Exemplo S.A." />
         </Field>
@@ -115,7 +115,7 @@ export function ProductForm({ defaultValues, onSubmit, onCancel, isPending, erro
       </div>
 
       {/* linha 4 */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Liquidez">
           <select {...register("liquidity")} className="input">
             <option value="">Selecionar…</option>

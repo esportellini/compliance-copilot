@@ -10,7 +10,6 @@ import { fmtCurrency } from "@/lib/utils";
 import { Download } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
 } from "recharts";
 
 const PERIOD_OPTIONS = [
@@ -20,16 +19,6 @@ const PERIOD_OPTIONS = [
   { value: 180, label: "6 meses" },
 ];
 
-const DECISION_COLORS: Record<string,string> = {
-  ALLOWED: "#10b981", REPORT_REQUIRED: "#f59e0b",
-  PRE_APPROVAL_REQUIRED: "#3b82f6", RESTRICTED: "#ef4444", INCONCLUSIVE: "#94a3b8",
-};
-const RISK_COLORS: Record<string,string> = { LOW: "#10b981", MEDIUM: "#f59e0b", HIGH: "#ef4444" };
-
-const PA_STATUS_COLORS: Record<string,string> = {
-  PENDING: "#94a3b8", IN_REVIEW: "#3b82f6", APPROVED: "#10b981",
-  APPROVED_WITH_CONDITIONS: "#f59e0b", REJECTED: "#ef4444", CANCELLED: "#cbd5e1",
-};
 const PA_STATUS_LABELS: Record<string,string> = {
   PENDING: "Pendente", IN_REVIEW: "Em análise", APPROVED: "Aprovado",
   APPROVED_WITH_CONDITIONS: "c/ ressalvas", REJECTED: "Rejeitado", CANCELLED: "Cancelado",
@@ -77,19 +66,16 @@ export default function ReportsPage() {
   const decisionPie = Object.entries(summary?.by_decision ?? {}).map(([k, v]) => ({
     name: DECISION_CONFIG[k as keyof typeof DECISION_CONFIG]?.label ?? k,
     value: v as number,
-    color: DECISION_COLORS[k] ?? "#94a3b8",
   }));
 
   const riskPie = Object.entries(summary?.by_risk ?? {}).map(([k, v]) => ({
     name: RISK_CONFIG[k as keyof typeof RISK_CONFIG]?.label ?? k,
     value: v as number,
-    color: RISK_COLORS[k] ?? "#94a3b8",
   }));
 
   const paPie = Object.entries(paByStatus).map(([k, v]) => ({
     name: PA_STATUS_LABELS[k] ?? k,
     value: v as number,
-    color: PA_STATUS_COLORS[k] ?? "#94a3b8",
   }));
 
   return (
@@ -117,7 +103,7 @@ export default function ReportsPage() {
       ) : (
         <div className="space-y-6">
           {/* métricas */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4 [&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none">
             <MetricCard label="Total de consultas" value={summary?.total_queries ?? 0} />
             <MetricCard label="Inconclusivas"
               value={`${summary?.inconclusive_count ?? 0} (${summary?.inconclusive_pct ?? 0}%)`}
@@ -127,7 +113,7 @@ export default function ReportsPage() {
               color="text-brand-500" />
             <MetricCard label="Precisam revisão"
               value={summary?.by_decision?.["PRE_APPROVAL_REQUIRED"] ?? 0}
-              color="text-blue-500" />
+              color="text-amber-700" />
           </div>
 
           {/* consultas por dia + decisões */}
@@ -138,50 +124,27 @@ export default function ReportsPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#3b5bdb" radius={[3,3,0,0]} />
+                  <Bar dataKey="count" fill="#176149" radius={[3,3,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             </SectionCard>
 
             <SectionCard title="Decisões no período">
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={decisionPie} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({ name, value }) => `${name} (${value})`} labelLine={false}>
-                    {decisionPie.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <ResponsiveContainer width="100%" height={200}><BarChart data={decisionPie} layout="vertical" margin={{ left: 8 }}><XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} /><YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="value" fill="#176149" radius={[0,3,3,0]} /></BarChart></ResponsiveContainer>
             </SectionCard>
           </div>
 
           {/* risco + pré-aprovações */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SectionCard title="Distribuição de risco">
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={riskPie} cx="50%" cy="50%" outerRadius={65} dataKey="value">
-                    {riskPie.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                  <Legend />
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <ResponsiveContainer width="100%" height={180}><BarChart data={riskPie} layout="vertical" margin={{ left: 8 }}><XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} /><YAxis type="category" dataKey="name" width={72} tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="value" fill="#50635b" radius={[0,3,3,0]} /></BarChart></ResponsiveContainer>
             </SectionCard>
 
             <SectionCard title="Pré-aprovações por status">
               {paPie.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-8">Sem dados no período.</p>
               ) : (
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie data={paPie} cx="50%" cy="50%" outerRadius={65} dataKey="value">
-                      {paPie.map((d, i) => <Cell key={i} fill={d.color} />)}
-                    </Pie>
-                    <Legend />
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height={180}><BarChart data={paPie} layout="vertical" margin={{ left: 8 }}><XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} /><YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="value" fill="#8a6a21" radius={[0,3,3,0]} /></BarChart></ResponsiveContainer>
               )}
             </SectionCard>
           </div>

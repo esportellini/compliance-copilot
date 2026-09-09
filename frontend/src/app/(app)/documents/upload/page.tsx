@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -26,19 +26,18 @@ function Field({ label, hint, error, children }: {
   label: string; hint?: string; error?: string; children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="label">{label}</label>
+    <label className="block">
+      <span className="label">{label}</span>
       {children}
       {hint && !error && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
-    </div>
+    </label>
   );
 }
 
 export default function UploadPage() {
   const router = useRouter();
   const qc = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile]     = useState<File | null>(null);
   const [error, setError]   = useState("");
   const [dragOver, setDrag] = useState(false);
@@ -78,7 +77,7 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-4xl">
       <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
         <Link href="/documents" className="hover:text-brand-600">Documentos</Link>
         <span>/</span>
@@ -92,9 +91,8 @@ export default function UploadPage() {
 
         {/* dropzone */}
         <div
-          className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer
+          className={`border border-dashed rounded-lg p-8 text-center transition-colors
             ${dragOver ? "border-brand-400 bg-brand-50" : "border-slate-300 hover:border-brand-300 hover:bg-slate-50"}`}
-          onClick={() => fileRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}
           onDrop={(e) => {
@@ -103,7 +101,7 @@ export default function UploadPage() {
             if (f) handleFile(f);
           }}
         >
-          <input ref={fileRef} type="file" accept=".pdf,.docx,.txt" className="hidden"
+          <input id="document-file" type="file" accept=".pdf,.docx,.txt" className="sr-only"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
           {file ? (
             <div className="flex items-center justify-center gap-3">
@@ -114,22 +112,22 @@ export default function UploadPage() {
                   {(file.size / 1024).toFixed(1)} KB · {file.type || "desconhecido"}
                 </p>
               </div>
-              <button type="button" onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                className="ml-2 text-slate-400 hover:text-red-500 transition-colors">
+              <button type="button" onClick={() => setFile(null)}
+                className="ml-2 rounded-md p-1 text-slate-500 hover:bg-red-50 hover:text-red-700" aria-label="Remover arquivo selecionado">
                 <X size={16} />
               </button>
             </div>
           ) : (
-            <div>
+            <label htmlFor="document-file" className="block cursor-pointer">
               <UploadCloud size={32} className="mx-auto text-slate-300 mb-2" />
               <p className="text-sm text-slate-500">Arraste o arquivo ou clique para selecionar</p>
               <p className="text-xs text-slate-400 mt-1">PDF, DOCX ou TXT · máx 20 MB</p>
-            </div>
+            </label>
           )}
         </div>
 
         <div className="card p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Nome do documento *" error={errors.name?.message}>
               <input {...register("name")} className="input" placeholder="Ex: Código de Ética 2024" />
             </Field>
@@ -143,7 +141,7 @@ export default function UploadPage() {
             </Field>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label="Versão" hint="Obrigatório para ativar">
               <input {...register("version")} className="input" placeholder="Ex: 2.1" />
             </Field>

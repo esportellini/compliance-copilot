@@ -7,7 +7,9 @@ import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { DOCUMENT_TYPES, DOC_TYPE_MAP, STATUS_OPTIONS, STATUS_BADGE, STATUS_MAP, fmtSize } from "@/lib/documents";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SkeletonRows } from "@/components/ui/Skeleton";
+import { DOCUMENT_TYPES, DOC_TYPE_MAP, STATUS_OPTIONS, STATUS_MAP, fmtSize } from "@/lib/documents";
 import { fmtDate } from "@/lib/utils";
 import { FileText } from "lucide-react";
 
@@ -43,7 +45,7 @@ export default function DocumentsPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="mb-5 flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
         <select value={typeF} onChange={(e) => setTypeF(e.target.value)} className="input w-64">
           <option value="">Tipo</option>
           {DOCUMENT_TYPES.map(({ value, label }) => (
@@ -66,11 +68,11 @@ export default function DocumentsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Spinner className="h-8 w-8" /></div>
+        <div className="card p-4"><SkeletonRows rows={7} /></div>
       ) : docs.length === 0 ? (
         <EmptyState message="Nenhum documento encontrado." icon={<FileText />} />
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
               <tr>
@@ -100,9 +102,7 @@ export default function DocumentsPage() {
                   <td className="px-4 py-3 text-slate-500">{DOC_TYPE_MAP[d.doc_type] ?? d.doc_type}</td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-600">{d.version ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[d.status] ?? "bg-slate-100"}`}>
-                      {STATUS_MAP[d.status] ?? d.status}
-                    </span>
+                    <StatusBadge status={d.status} label={STATUS_MAP[d.status] ?? d.status} />
                   </td>
                   <td className="px-4 py-3 text-slate-500">{d.owner ?? "—"}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-slate-500">{d.chunk_count}</td>

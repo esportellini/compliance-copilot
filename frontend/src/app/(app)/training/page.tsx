@@ -9,12 +9,12 @@ import { Spinner } from "@/components/ui/Spinner";
 import { CheckCircle2, Circle, BookOpen, AlertTriangle } from "lucide-react";
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
-  TOOL:       { label: "Uso do Copilot",   color: "bg-blue-100 text-blue-700" },
-  COMPLIANCE: { label: "Compliance",       color: "bg-purple-100 text-purple-700" },
-  PRIVACIDADE:{ label: "Privacidade",      color: "bg-emerald-100 text-emerald-700" },
-  ETICA:      { label: "Ética",            color: "bg-amber-100 text-amber-700" },
+  TOOL:       { label: "Uso do Copilot",   color: "bg-blue-50 text-blue-800 ring-1 ring-blue-700/20" },
+  COMPLIANCE: { label: "Compliance",       color: "bg-brand-50 text-brand-800 ring-1 ring-brand-700/20" },
+  PRIVACIDADE:{ label: "Privacidade",      color: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-700/20" },
+  ETICA:      { label: "Ética",            color: "bg-amber-50 text-amber-900 ring-1 ring-amber-700/20" },
   POLICY:     { label: "Política",         color: "bg-slate-100 text-slate-600" },
-  OPERATIONS: { label: "Operações",        color: "bg-orange-100 text-orange-700" },
+  OPERATIONS: { label: "Operações",        color: "bg-slate-100 text-slate-700 ring-1 ring-slate-500/20" },
 };
 
 const TERMS = [
@@ -71,7 +71,7 @@ export default function TrainingPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <PageHeader title="Treinamentos" subtitle={`${done} de ${total} concluídos`} />
 
       {/* barra de progresso */}
@@ -80,7 +80,7 @@ export default function TrainingPage() {
           <span className="text-sm font-medium text-slate-700">Progresso geral</span>
           <span className="text-sm font-bold text-brand-600">{pct}%</span>
         </div>
-        <div className="w-full bg-slate-100 rounded-full h-2.5">
+          <div className="h-2 w-full rounded-full bg-slate-100" role="progressbar" aria-label="Progresso dos treinamentos" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
           <div
             className="bg-brand-500 h-2.5 rounded-full transition-all"
             style={{ width: `${pct}%` }}
@@ -111,7 +111,7 @@ export default function TrainingPage() {
                   {cfg.label}
                 </span>
               </div>
-              <div className="space-y-3">
+              <div className="grid gap-3 lg:grid-cols-2">
                 {items.map((item: any) => (
                   <div key={item.id}
                     className={`card p-5 transition-colors ${item.acknowledged ? "border-emerald-200 bg-emerald-50/30" : ""}`}>
@@ -119,7 +119,7 @@ export default function TrainingPage() {
                       <button
                         onClick={() => canAcknowledge && !item.acknowledged && ack.mutate(item.id)}
                         disabled={item.acknowledged || !canAcknowledge}
-                        className="shrink-0 mt-0.5">
+                        className="shrink-0 mt-0.5" aria-label={item.acknowledged ? `${item.title}: concluído` : `Marcar ${item.title} como lido`}>
                         {item.acknowledged
                           ? <CheckCircle2 size={20} className="text-emerald-500" />
                           : <Circle size={20} className="text-slate-300 hover:text-brand-400 transition-colors" />}

@@ -12,6 +12,7 @@ import { RiskBadge } from "@/components/ui/RiskBadge";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Scale, X, FlaskConical } from "lucide-react";
 
 // ─── constantes ────────────────────────────────────────────────────────────────
@@ -108,11 +109,11 @@ function Modal({
   wide?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-xl shadow-xl w-full ${wide ? "max-w-2xl" : "max-w-lg"}`}>
+    <div className="modal-backdrop">
+      <div className={`modal-panel ${wide ? "max-w-2xl" : "max-w-lg"}`} role="dialog" aria-modal="true" aria-labelledby="rule-modal-title">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+          <h2 id="rule-modal-title" className="font-semibold text-slate-950">{title}</h2>
+          <button onClick={onClose} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Fechar">
             <X size={18} />
           </button>
         </div>
@@ -134,12 +135,12 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="label">{label}</label>
+    <label className="block">
+      <span className="label">{label}</span>
       {children}
       {hint && !error && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
-    </div>
+    </label>
   );
 }
 
@@ -232,6 +233,7 @@ export default function RulesPage() {
   const [simulating, setSimulating] = useState(false);
   const [simResult, setSimResult] = useState<any>(null);
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ["rules"],
@@ -265,7 +267,7 @@ export default function RulesPage() {
   const toggleMutation = useMutation({
     mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
       api.patch(`/rules/${id}`, { is_active }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["rules"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rules"] }); setDeleteTarget(null); },
   });
 
   const deleteMutation = useMutation({
@@ -324,7 +326,7 @@ export default function RulesPage() {
       ) : rules.length === 0 ? (
         <EmptyState message="Nenhuma regra configurada." icon={<Scale />} />
       ) : (
-        <div className="card">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
               <tr>
@@ -379,7 +381,7 @@ export default function RulesPage() {
                           Editar
                         </button>
                         <button
-                          onClick={() => { if (confirm(`Excluir a regra "${r.name}"?`)) deleteMutation.mutate(r.id); }}
+                          onClick={() => setDeleteTarget(r)}
                           className="text-xs text-red-500 hover:underline">
                           Excluir
                         </button>
@@ -484,6 +486,17 @@ export default function RulesPage() {
           )}
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Excluir regra de compliance"
+        description={`A regra “${deleteTarget?.name ?? ""}” será removida do motor configurado. Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir regra"
+        destructive
+        busy={deleteMutation.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

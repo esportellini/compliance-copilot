@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Spinner } from "@/components/ui/Spinner";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fmtDateTime } from "@/lib/utils";
 import { ShieldAlert, Download, X } from "lucide-react";
@@ -26,11 +27,11 @@ const SEV_BADGE: Record<string,string> = {
 
 function DetailModal({ event, onClose }: { event: any; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="modal-panel max-w-xl" role="dialog" aria-modal="true" aria-labelledby="audit-detail-title">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800 font-mono text-sm">{event.event_type}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+          <div><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Evento de auditoria #{event.id}</p><h2 id="audit-detail-title" className="mt-1 font-mono text-sm font-semibold text-slate-950">{event.event_type}</h2></div>
+          <button onClick={onClose} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Fechar detalhe"><X size={18} /></button>
         </div>
         <div className="px-6 py-5 space-y-3 text-sm">
           <Row label="Data" value={fmtDateTime(event.created_at)} />
@@ -101,7 +102,7 @@ export default function AuditPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="mb-5 flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
         <select value={eventTypeF} onChange={(e) => setEventType(e.target.value)} className="input w-56">
           <option value="">Tipo de evento</option>
           {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -121,11 +122,11 @@ export default function AuditPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Spinner className="h-8 w-8" /></div>
+        <div className="card p-4"><SkeletonRows rows={8} /></div>
       ) : data.length === 0 ? (
         <EmptyState message="Nenhum evento encontrado." icon={<ShieldAlert />} />
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-slate-50 text-slate-500 uppercase tracking-wide">
               <tr>
@@ -139,8 +140,9 @@ export default function AuditPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.map((e: any) => (
-                <tr key={e.id}
+                <tr key={e.id} tabIndex={0} role="button"
                   onClick={() => setSelected(e)}
+                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(e); } }}
                   className="hover:bg-slate-50 transition-colors cursor-pointer">
                   <td className="px-4 py-2 whitespace-nowrap text-slate-400">{fmtDateTime(e.created_at)}</td>
                   <td className="px-4 py-2 font-mono font-medium text-slate-700">{e.event_type}</td>
