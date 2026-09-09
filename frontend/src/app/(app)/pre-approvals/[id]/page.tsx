@@ -11,9 +11,11 @@ import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { STATUS_CONFIG, type StatusKey } from "@/lib/pre-approvals";
 import { fmtCurrency, fmtDate, fmtDateTime } from "@/lib/utils";
-import { ChevronLeft, Send } from "lucide-react";
+import { Bot, CheckCircle2, ChevronLeft, MessageSquareText, Send, UserCheck } from "lucide-react";
 
 const TERMINAL = ["APPROVED","APPROVED_WITH_CONDITIONS","REJECTED","CANCELLED"];
 
@@ -34,26 +36,21 @@ type CommentForm = z.infer<typeof commentSchema>;
 // ─── timeline ─────────────────────────────────────────────────────────────────
 function Timeline({ request }: { request: any }) {
   const events = [
-    { key: "created", label: "Solicitação criada", at: request.created_at },
-    ...(request.copilot_initial_response ? [{ key: "analysis", label: `Análise inicial: ${request.copilot_initial_decision ?? "registrada"}`, at: request.created_at }] : []),
-    ...(request.review_started_at ? [{ key: "review", label: "Revisão iniciada", at: request.review_started_at }] : []),
-    ...(request.comments ?? []).map((comment: any) => ({ key: `comment-${comment.id}`, label: `Comentário de ${comment.author_name}`, at: comment.created_at })),
-    ...(request.decided_at ? [{ key: "decision", label: `Decisão final: ${(STATUS_CONFIG[request.status as StatusKey] ?? STATUS_CONFIG.PENDING).label}`, at: request.decided_at }] : []),
-    ...(request.status === "CANCELLED" ? [{ key: "cancelled", label: "Solicitação cancelada", at: request.updated_at }] : []),
+    { key: "created", label: "Solicitação criada", at: request.created_at, type: "human" },
+    ...(request.copilot_initial_response ? [{ key: "analysis", label: `Análise inicial: ${request.copilot_initial_decision ?? "registrada"}`, at: request.created_at, type: "automated" }] : []),
+    ...(request.review_started_at ? [{ key: "review", label: "Revisão humana iniciada", at: request.review_started_at, type: "review" }] : []),
+    ...(request.comments ?? []).map((comment: any) => ({ key: `comment-${comment.id}`, label: `Comentário de ${comment.author_name}`, at: comment.created_at, type: "comment" })),
+    ...(request.decided_at ? [{ key: "decision", label: `Decisão final: ${(STATUS_CONFIG[request.status as StatusKey] ?? STATUS_CONFIG.PENDING).label}`, at: request.decided_at, type: "decision" }] : []),
+    ...(request.status === "CANCELLED" ? [{ key: "cancelled", label: "Solicitação cancelada", at: request.updated_at, type: "decision" }] : []),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   return (
-    <div className="card p-5 mb-6">
-      <h3 className="text-sm font-semibold text-slate-700 mb-3">Timeline</h3>
-      <div className="space-y-3">
-        {events.map((event) => (
-          <div key={event.key} className="flex gap-3 text-sm">
-            <div className="mt-1 h-2 w-2 rounded-full bg-brand-500 shrink-0" />
-            <div>
-              <p className="text-slate-700">{event.label}</p>
-              <p className="text-xs text-slate-400">{fmtDateTime(event.at)}</p>
-            </div>
-          </div>
-        ))}
+    <div className="card mb-6 p-5">
+      <h3 className="text-sm font-semibold text-slate-900">Linha do tempo</h3>
+      <div className="mt-4">
+        {events.map((event, index) => {
+          const Icon = event.type === "automated" ? Bot : event.type === "comment" ? MessageSquareText : event.type === "review" ? UserCheck : CheckCircle2;
+          return <div key={event.key} className="relative flex gap-3 pb-5 last:pb-0">{index < events.length - 1 && <span className="absolute left-[11px] top-6 h-[calc(100%-18px)] w-px bg-slate-200" aria-hidden="true" />}<span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-4 ring-white ${event.type === "automated" ? "bg-blue-100 text-blue-700" : "bg-brand-100 text-brand-800"}`}><Icon size={13} /></span><div><p className="text-sm font-medium text-slate-800">{event.label}</p><p className="mt-0.5 text-xs tabular-nums text-slate-500">{fmtDateTime(event.at)}</p>{event.type === "automated" && <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-600">Análise automatizada</p>}</div></div>;
+        })}
       </div>
     </div>
   );
@@ -70,6 +67,7 @@ export default function PreApprovalDetailPage() {
 
   const [showDecision, setShowDecision] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [pendingDecision, setPendingDecision] = useState<DecisionForm | null>(null);
 
   const { data: req, isLoading, error: loadError } = useQuery({
     queryKey: ["pre-approval", id],
@@ -90,7 +88,7 @@ export default function PreApprovalDetailPage() {
 
   const decisionMutation = useMutation({
     mutationFn: (d: DecisionForm) => api.patch(`/pre-approvals/${id}/status`, d),
-    onSuccess: () => { invalidate(); setShowDecision(false); setActionError(""); },
+    onSuccess: () => { invalidate(); setShowDecision(false); setPendingDecision(null); setActionError(""); },
     onError: (e: any) => setActionError(e.response?.data?.detail ?? "Erro"),
   });
 
@@ -114,7 +112,7 @@ export default function PreApprovalDetailPage() {
   const canEmployeeCancel = user?.role === "EMPLOYEE" && req.status === "PENDING";
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-5xl">
       <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
         <Link href="/pre-approvals" className="hover:text-brand-600 flex items-center gap-1">
           <ChevronLeft size={14} /> Pré-aprovações
@@ -138,7 +136,7 @@ export default function PreApprovalDetailPage() {
               Atualizar status
             </button>
           ) : canEmployeeCancel ? (
-            <button onClick={() => decisionMutation.mutate({ status: "CANCELLED" })} className="btn-ghost text-sm">
+            <button onClick={() => setPendingDecision({ status: "CANCELLED" })} className="btn-secondary text-red-700 hover:border-red-300 hover:bg-red-50">
               Cancelar solicitação
             </button>
           ) : undefined
@@ -148,8 +146,8 @@ export default function PreApprovalDetailPage() {
       <Timeline request={req} />
 
       {/* badge status */}
-      <div className="flex items-center gap-2 mb-6">
-        <span className={`text-sm font-medium px-3 py-1 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3">
+        <StatusBadge status={req.status} label={cfg.label} />
         {req.reviewer && (
           <span className="text-xs text-slate-500">por {req.reviewer}</span>
         )}
@@ -164,19 +162,19 @@ export default function PreApprovalDetailPage() {
       {showDecision && (
         <div className="card p-5 mb-5 border-2 border-brand-200">
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Registrar decisão</h3>
-          <form onSubmit={decisionForm.handleSubmit((d) => { setActionError(""); decisionMutation.mutate(d); })}
+          <form onSubmit={decisionForm.handleSubmit((d) => { setActionError(""); setPendingDecision(d); })}
             className="space-y-3">
             <div>
-              <label className="label">Status</label>
-              <select {...decisionForm.register("status")} className="input">
+              <label htmlFor="approval-status" className="label">Status</label>
+              <select id="approval-status" {...decisionForm.register("status")} className="input">
                 {statusOptions.map((status) => (
                   <option key={status} value={status}>{STATUS_CONFIG[status as StatusKey].label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="label">Parecer do compliance</label>
-              <textarea {...decisionForm.register("compliance_opinion")} rows={3}
+              <label htmlFor="compliance-opinion" className="label">Parecer do compliance</label>
+              <textarea id="compliance-opinion" {...decisionForm.register("compliance_opinion")} rows={3}
                 className="input resize-none" placeholder="Fundamento da decisão, condições ou restrições…" />
               {decisionForm.formState.errors.compliance_opinion && (
                 <p className="text-xs text-red-600 mt-1">{decisionForm.formState.errors.compliance_opinion.message}</p>
@@ -273,7 +271,7 @@ export default function PreApprovalDetailPage() {
             <input {...commentForm.register("body")} className="input flex-1 text-sm"
               placeholder="Adicionar comentário…" />
             <button type="submit" disabled={commentMutation.isPending}
-              className="btn-primary text-sm px-3 flex items-center gap-1">
+              className="btn-primary text-sm px-3 flex items-center gap-1" aria-label="Enviar comentário">
               {commentMutation.isPending
                 ? <Spinner className="h-4 w-4 border-white border-t-transparent" />
                 : <Send size={14} />}
@@ -281,6 +279,16 @@ export default function PreApprovalDetailPage() {
           </form>
         </div>}
       </div>
+      <ConfirmDialog
+        open={pendingDecision !== null}
+        title={pendingDecision?.status === "CANCELLED" ? "Cancelar solicitação" : "Confirmar atualização de status"}
+        description={pendingDecision?.status === "CANCELLED" ? "O cancelamento é terminal e não poderá ser revertido." : "Esta ação será registrada na trilha de auditoria. Revise o status e o parecer antes de confirmar."}
+        confirmLabel={pendingDecision?.status === "CANCELLED" ? "Cancelar solicitação" : "Registrar decisão"}
+        destructive={pendingDecision?.status === "CANCELLED" || pendingDecision?.status === "REJECTED"}
+        busy={decisionMutation.isPending}
+        onClose={() => setPendingDecision(null)}
+        onConfirm={() => pendingDecision && decisionMutation.mutate(pendingDecision)}
+      />
     </div>
   );
 }

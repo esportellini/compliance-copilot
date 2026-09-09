@@ -6,7 +6,10 @@ import { api } from "@/lib/api";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { DECISION_CONFIG, RISK_CONFIG, PRODUCT_TYPES, type DecisionKey } from "@/lib/copilot";
+import { DecisionBadge } from "@/components/ui/DecisionBadge";
+import { RiskBadge } from "@/components/ui/RiskBadge";
+import { SkeletonRows } from "@/components/ui/Skeleton";
+import { DECISION_CONFIG, RISK_CONFIG, PRODUCT_TYPES } from "@/lib/copilot";
 import { fmtDateTime, fmtCurrency } from "@/lib/utils";
 import { History, AlertTriangle, X } from "lucide-react";
 
@@ -49,7 +52,7 @@ export default function HistoryPage() {
       />
 
       {/* filtros */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="mb-5 flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-3">
         <select value={decisionF} onChange={(e) => setDecision(e.target.value)} className="input w-44">
           <option value="">Decisão</option>
           {DECISIONS.map(({ value, label }) => (
@@ -85,14 +88,14 @@ export default function HistoryPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Spinner className="h-8 w-8" /></div>
+        <div className="card p-4"><SkeletonRows rows={7} /></div>
       ) : data.length === 0 ? (
         <EmptyState
           message={hasFilters ? "Nenhuma consulta corresponde aos filtros." : "Nenhuma consulta realizada."}
           icon={<History />}
         />
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
               <tr>
@@ -107,8 +110,6 @@ export default function HistoryPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.map((q: any) => {
-                const dcfg = DECISION_CONFIG[q.decision as DecisionKey] ?? DECISION_CONFIG.INCONCLUSIVE;
-                const rcfg = RISK_CONFIG[q.risk_level as keyof typeof RISK_CONFIG] ?? RISK_CONFIG.MEDIUM;
                 return (
                   <tr key={q.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 max-w-xs">
@@ -122,19 +123,15 @@ export default function HistoryPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">{q.product_type ?? "—"}</td>
+                    <td className="px-4 py-3 text-xs"><p className="font-mono font-semibold text-slate-800">{q.product_identifier ?? "—"}</p><p className="mt-0.5 text-slate-500">{q.product_label ?? q.product_type ?? "Produto não informado"}</p></td>
                     <td className="px-4 py-3 text-slate-500 text-xs">
                       {q.amount ? fmtCurrency(q.amount) : "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${dcfg.badge}`}>
-                        {dcfg.label}
-                      </span>
+                      <DecisionBadge decision={q.decision} />
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${rcfg.badge}`}>
-                        {rcfg.label}
-                      </span>
+                      <RiskBadge risk={q.risk_level} />
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-slate-500 text-xs">
                       {Math.round(q.confidence * 100)}%

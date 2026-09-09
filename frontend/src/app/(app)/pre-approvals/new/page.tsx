@@ -11,7 +11,9 @@ import { useAuth } from "@/lib/auth-context";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
+import { DecisionBadge } from "@/components/ui/DecisionBadge";
 import { OPERATION_TYPES } from "@/lib/pre-approvals";
+import { ArrowLeft, Link2 } from "lucide-react";
 
 const schema = z.object({
   product_label:    z.string().min(2, "Informe o produto"),
@@ -26,12 +28,12 @@ function Field({ label, hint, error, children }: {
   label: string; hint?: string; error?: string; children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="label">{label}</label>
+    <label className="block">
+      <span className="label">{label}</span>
       {children}
-      {hint && !error && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
-      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
-    </div>
+      {hint && !error && <p className="field-help">{hint}</p>}
+      {error && <p className="field-error">{error}</p>}
+    </label>
   );
 }
 
@@ -90,20 +92,12 @@ export default function NewPreApprovalPage() {
   }
 
   return (
-    <div className="max-w-xl">
-      <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
-        <Link href="/pre-approvals" className="hover:text-brand-600">Pré-aprovações</Link>
-        <span>/</span>
-        <span className="text-slate-700">Nova solicitação</span>
-      </div>
+    <div className="max-w-4xl">
+      <Link href="/pre-approvals" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-brand-700"><ArrowLeft size={15} />Voltar para a fila</Link>
 
-      <PageHeader title="Nova pré-aprovação" subtitle="O Copilot fará uma análise inicial antes de submeter" />
+      <PageHeader title="Nova pré-aprovação" subtitle="Registre a operação e preserve o vínculo com a análise inicial, quando disponível." />
 
-      {fromQuery && (
-        <Alert variant="info" className="mb-4">
-          Pré-aprovação vinculada à consulta #{fromQuery}. A análise inicial persistida será reutilizada.
-        </Alert>
-      )}
+      {fromQuery && sourceQuery.data && <section className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4"><div className="flex flex-wrap items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100 text-blue-800"><Link2 size={16} /></span><div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">Origem: consulta Copilot #{fromQuery}</p><p className="mt-1 truncate text-sm font-medium text-blue-950">{sourceQuery.data.product_label ?? sourceQuery.data.product_identifier ?? "Produto não identificado"}</p></div>{sourceQuery.data.answer?.decision && <DecisionBadge decision={sourceQuery.data.answer.decision} />}</div><p className="mt-3 text-xs leading-5 text-blue-800">A análise estruturada já persistida será reutilizada. Revise os campos herdados e informe manualmente o tipo de operação.</p></section>}
 
       {fromQuery && !sourceQueryId && (
         <Alert variant="error" className="mb-4">Identificador de consulta inválido.</Alert>
@@ -117,11 +111,11 @@ export default function NewPreApprovalPage() {
         </Alert>
       )}
 
-      <div className="card p-6">
-        <form onSubmit={handleSubmit((d) => { setError(""); mutation.mutate(d); })} className="space-y-4">
+      <div className="card p-5 sm:p-6">
+        <form onSubmit={handleSubmit((d) => { setError(""); mutation.mutate(d); })} className="space-y-5">
           {error && <Alert variant="error">{error}</Alert>}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Produto *" error={errors.product_label?.message}>
               <input {...register("product_label")} readOnly={sourceQueryId !== null}
                 className="input read-only:bg-slate-50" placeholder="Ex: Fundo Alpha ou XPTO3" />
@@ -134,7 +128,7 @@ export default function NewPreApprovalPage() {
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Valor estimado (R$)">
               <input {...register("estimated_amount")} readOnly={sourceQueryId !== null}
                 type="number" min={0} step={1000} className="input read-only:bg-slate-50" placeholder="0" />
@@ -149,8 +143,8 @@ export default function NewPreApprovalPage() {
               placeholder="Ex: Diversificação da carteira pessoal com exposição a renda variável…" />
           </Field>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Link href="/pre-approvals" className="btn-ghost text-sm">Cancelar</Link>
+          <div className="flex flex-col-reverse justify-end gap-3 border-t border-slate-200 pt-5 sm:flex-row">
+            <Link href="/pre-approvals" className="btn-secondary">Cancelar</Link>
             <button type="submit" disabled={mutation.isPending || sourceQuery.isLoading || !!sourceQuery.error || (!!fromQuery && !sourceQueryId)} className="btn-primary text-sm flex items-center gap-2">
               {mutation.isPending && <Spinner className="h-4 w-4 border-white border-t-transparent" />}
               Submeter solicitação

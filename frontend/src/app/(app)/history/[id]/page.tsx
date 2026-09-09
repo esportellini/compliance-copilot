@@ -6,7 +6,10 @@ import { api } from "@/lib/api";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { Spinner } from "@/components/ui/Spinner";
-import { DECISION_CONFIG, RISK_CONFIG, type DecisionKey } from "@/lib/copilot";
+import { DecisionBadge } from "@/components/ui/DecisionBadge";
+import { RiskBadge } from "@/components/ui/RiskBadge";
+import { SourceCard } from "@/components/ui/SourceCard";
+import { DECISION_CONFIG, type DecisionKey } from "@/lib/copilot";
 import { fmtCurrency, fmtDateTime } from "@/lib/utils";
 import { ChevronLeft, AlertTriangle, ClipboardCheck } from "lucide-react";
 
@@ -38,10 +41,9 @@ export default function HistoryDetailPage() {
   const ans = data.answer;
   const decision = ans.decision as DecisionKey;
   const dcfg = DECISION_CONFIG[decision] ?? DECISION_CONFIG.INCONCLUSIVE;
-  const rcfg = RISK_CONFIG[ans.risk_level as keyof typeof RISK_CONFIG] ?? RISK_CONFIG.MEDIUM;
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-5xl">
       <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
         <Link href="/history" className="hover:text-brand-600 flex items-center gap-1">
           <ChevronLeft size={14} /> Histórico
@@ -70,13 +72,8 @@ export default function HistoryDetailPage() {
       {/* decisão */}
       <div className={`card border-2 ${dcfg.border} overflow-hidden mb-4`}>
         <div className={`${dcfg.bg} px-5 py-3 border-b ${dcfg.border} flex items-center gap-3 flex-wrap`}>
-          <span className="text-xl">{dcfg.icon}</span>
-          <span className={`text-sm font-semibold px-3 py-1 rounded-full ${dcfg.badge}`}>
-            {dcfg.label}
-          </span>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${rcfg.badge}`}>
-            Risco {rcfg.label}
-          </span>
+          <DecisionBadge decision={decision} />
+          <RiskBadge risk={ans.risk_level} />
           {ans.requires_human_review && (
             <span className="flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
               <AlertTriangle size={11} /> Revisão humana
@@ -115,18 +112,9 @@ export default function HistoryDetailPage() {
               <span className="ml-2 text-xs font-normal text-slate-400">{ans.sources.length}</span>
             </p>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="grid gap-3 p-4 lg:grid-cols-2">
             {ans.sources.map((s: any, i: number) => (
-              <div key={i} className="px-5 py-3">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-medium text-slate-700">
-                    {[s.document_name, s.section_title, s.page_number ? `pág. ${s.page_number}` : null]
-                      .filter(Boolean).join(" · ")}
-                  </p>
-                  <span className="text-xs text-slate-400">{Math.round(s.score * 100)}% relevância</span>
-                </div>
-                <p className="text-xs text-slate-500 line-clamp-3">{s.excerpt}</p>
-              </div>
+              <SourceCard key={i} source={s} />
             ))}
           </div>
         </div>

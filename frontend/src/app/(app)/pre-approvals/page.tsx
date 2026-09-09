@@ -1,95 +1,43 @@
 "use client";
+
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, ClipboardCheck, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { STATUS_CONFIG } from "@/lib/pre-approvals";
+import { fmtCurrency, fmtDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Alert } from "@/components/ui/Alert";
-import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { STATUS_CONFIG, type StatusKey } from "@/lib/pre-approvals";
-import { fmtDate, fmtCurrency } from "@/lib/utils";
-import { ClipboardCheck } from "lucide-react";
+import { FilterBar, TableFrame } from "@/components/ui/Panel";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
-const STATUS_OPTS = Object.entries(STATUS_CONFIG).map(([v, c]) => ({ value: v, label: c.label }));
+const STATUS_OPTIONS = Object.entries(STATUS_CONFIG).map(([value, config]) => ({ value, label: config.label }));
 
 export default function PreApprovalsPage() {
   const { user } = useAuth();
-  const [statusF, setStatus] = useState("");
-
+  const [status, setStatus] = useState("");
   const params = new URLSearchParams();
-  if (statusF) params.set("status", statusF);
-
-  const { data = [], isLoading, error } = useQuery({
-    queryKey: ["pre-approvals", statusF],
-    queryFn: () => api.get(`/pre-approvals?${params}`).then((r) => r.data),
-  });
-
-  const pending = data.filter((r: any) => ["PENDING","IN_REVIEW"].includes(r.status)).length;
+  if (status) params.set("status", status);
+  const { data = [], isLoading, error, refetch } = useQuery({ queryKey: ["pre-approvals", status], queryFn: () => api.get(`/pre-approvals?${params}`).then(response => response.data) });
+  const pending = data.filter((request: any) => ["PENDING", "IN_REVIEW"].includes(request.status)).length;
+  const canCreate = user?.role !== "AUDITOR";
 
   return (
     <div>
-      <PageHeader
-        title="Pré-aprovações"
-        subtitle={`${data.length} solicitaç${data.length !== 1 ? "ões" : "ão"}${pending ? ` · ${pending} pendente${pending !== 1 ? "s" : ""}` : ""}`}
-        action={user?.role !== "AUDITOR" ? <Link href="/pre-approvals/new" className="btn-primary text-sm">+ Nova solicitação</Link> : undefined}
-      />
-
-      <div className="flex gap-3 mb-6">
-        <select value={statusF} onChange={(e) => setStatus(e.target.value)} className="input w-52">
-          <option value="">Todos os status</option>
-          {STATUS_OPTS.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-      </div>
-
-      {error ? (
-        <Alert variant="error">
-          {(error as any).response?.data?.detail ?? "Não foi possível carregar as solicitações."}
-        </Alert>
-      ) : isLoading ? (
-        <div className="flex justify-center py-20"><Spinner className="h-8 w-8" /></div>
-      ) : data.length === 0 ? (
-        <EmptyState message="Nenhuma solicitação encontrada." icon={<ClipboardCheck />} />
-      ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
-              <tr>
-                <th className="px-4 py-3 text-left">Produto</th>
-                <th className="px-4 py-3 text-left">Operação</th>
-                <th className="px-4 py-3 text-left">Valor</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Data pretendida</th>
-                <th className="px-4 py-3 text-left">Solicitado em</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.map((r: any) => {
-                const cfg = STATUS_CONFIG[r.status as StatusKey] ?? STATUS_CONFIG.PENDING;
-                return (
-                  <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <Link href={`/pre-approvals/${r.id}`} className="font-medium text-brand-600 hover:underline">
-                        {r.product_label ?? `Produto #${r.product_id ?? "—"}`}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{r.operation_type}</td>
-                    <td className="px-4 py-3">{r.estimated_amount ? fmtCurrency(r.estimated_amount) : "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">{r.intended_date ? fmtDate(r.intended_date) : "—"}</td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">{fmtDate(r.created_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <PageHeader title="Fila de pré-aprovações" subtitle={`${data.length} solicitações no escopo · ${pending} aguardando andamento`} action={canCreate && <Link href="/pre-approvals/new" className="btn-primary"><Plus size={16} />Nova solicitação</Link>} />
+      <FilterBar><label htmlFor="status-filter" className="text-xs font-semibold text-slate-600">Status</label><select id="status-filter" value={status} onChange={event => setStatus(event.target.value)} className="input w-full sm:w-56"><option value="">Todos os status</option>{STATUS_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span className="ml-auto text-xs tabular-nums text-slate-500">{data.length} resultados</span></FilterBar>
+      {error ? <Alert variant="error">{(error as any).response?.data?.detail ?? "Não foi possível carregar as solicitações."}<button onClick={() => refetch()} className="ml-2 font-semibold underline underline-offset-2">Tentar novamente</button></Alert>
+      : isLoading ? <TableSkeleton />
+      : data.length === 0 ? <div className="card"><EmptyState message={status ? "Nenhuma solicitação corresponde ao filtro." : "Nenhuma pré-aprovação registrada."} icon={<ClipboardCheck size={28} />} />{canCreate && !status && <div className="flex justify-center border-t border-slate-200 p-4"><Link href="/pre-approvals/new" className="btn-secondary">Criar solicitação</Link></div>}</div>
+      : <TableFrame><table><thead><tr><th>ID</th><th>Solicitante</th><th>Produto</th><th>Operação</th><th className="text-right">Valor</th><th>Status</th><th>Criada em</th><th>Responsável</th><th><span className="sr-only">Ação</span></th></tr></thead><tbody>{data.map((request: any) => <tr key={request.id}><td className="px-4 py-3 font-mono text-xs font-semibold text-slate-500">#{request.id}</td><td className="px-4 py-3 text-slate-600">Usuário #{request.requester_id}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900">{request.product_label ?? `Produto #${request.product_id ?? "—"}`}</p>{request.intended_date && <p className="mt-0.5 text-xs text-slate-500">Pretendida em {fmtDate(request.intended_date)}</p>}</td><td className="px-4 py-3 text-slate-600">{request.operation_type}</td><td className="px-4 py-3 text-right tabular-nums text-slate-700">{request.estimated_amount ? fmtCurrency(request.estimated_amount) : "—"}</td><td className="px-4 py-3"><StatusBadge status={request.status} /></td><td className="px-4 py-3 whitespace-nowrap text-xs tabular-nums text-slate-500">{fmtDate(request.created_at)}</td><td className="px-4 py-3 text-xs text-slate-500">{request.reviewer ?? "Não atribuído"}</td><td className="px-4 py-3 text-right"><Link href={`/pre-approvals/${request.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-900">Abrir<ArrowRight size={14} /></Link></td></tr>)}</tbody></table></TableFrame>}
     </div>
   );
+}
+
+function TableSkeleton() {
+  return <div className="card p-4"><Skeleton className="mb-3 h-10 w-full" />{[1,2,3,4].map(row => <Skeleton key={row} className="mb-2 h-12 w-full" />)}</div>;
 }
