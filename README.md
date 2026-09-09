@@ -32,6 +32,8 @@ BM25; optional OpenAI embeddings can refine ranking, and the provider can only
 explain the decision it receives. Missing applicable rules fail closed as
 `INCONCLUSIVE`.
 
+![Compliance Copilot deterministic decision workflow](docs/assets/copilot-pre-approval.png)
+
 ## How it works
 
 ```text
@@ -52,6 +54,39 @@ Persisted timeline + audit trail
 
 ## Product walkthrough
 
+### Operational overview
+
+Role-scoped metrics, decision distribution, pending work, and recent activity
+give Compliance a concise view of the current operating state.
+
+![Compliance operations dashboard](docs/assets/dashboard.png)
+
+### Decision support
+
+The Copilot combines structured context with deterministic compliance rules
+before any AI-generated explanation, as shown in the decision workflow above.
+
+### Documentary evidence
+
+Retrieved policy excerpts remain separate from the structured decision and
+expose document metadata and relevance.
+
+![Policy evidence](docs/assets/copilot-evidence.png)
+
+### Human approval workflow
+
+Operations requiring approval move into a traceable human review process with
+comments, timestamps, an initial decision snapshot, and a final opinion.
+
+![Pre-approval workflow](docs/assets/pre-approval-detail.png)
+
+### Auditability
+
+Relevant actions remain available to authorized oversight roles through the
+audit trail.
+
+![Audit trail](docs/assets/audit-trail.png)
+
 The canonical demo covers all five decisions and the absence-of-policy path:
 
 | Scenario | Expected result |
@@ -63,8 +98,8 @@ The canonical demo covers all five decisions and the absence-of-policy path:
 | Cryptocurrency | `RESTRICTED` |
 | Fixed-income product with no applicable rule | `INCONCLUSIVE` |
 
-The interface in the repository is the source of truth; the project does not
-use a separate product mockup.
+All screenshots come from the current application running against PostgreSQL
+with the repository's official fictional seed data.
 
 ## Key features
 
