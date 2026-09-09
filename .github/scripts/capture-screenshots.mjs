@@ -83,30 +83,28 @@ await page.getByRole("heading", { name: "Evidências documentais" }).evaluate(
 );
 await screenshot(page, "copilot-evidence.png");
 
-await page.getByRole("button", { name: "Solicitar pré-aprovação" }).click();
-await page.waitForURL("**/pre-approvals/new?from_query=*");
-await page.getByLabel(/Tipo de operação/).selectOption("COMPRA");
-await page.getByRole("button", { name: "Submeter solicitação" }).click();
-await page.waitForURL(/\/pre-approvals\/\d+$/);
-const requestId = page.url().split("/").at(-1);
+const sourceQuery = (await api(employeeToken, "/copilot/history"))[0];
+const request = await api(employeeToken, "/pre-approvals", "POST", {
+  source_query_id: sourceQuery.id,
+  product_id: sourceQuery.product_id,
+  product_label: sourceQuery.product_label ?? sourceQuery.product_identifier,
+  operation_type: "COMPRA",
+  estimated_amount: sourceQuery.amount,
+  justification: sourceQuery.objective,
+});
+const requestId = request.id;
+const complianceToken = await token("compliance@demo.local");
+await api(complianceToken, `/pre-approvals/${requestId}/comments`, "POST", {
+  body: "Documentação e limites conferidos conforme a política vigente.",
+});
+await api(complianceToken, `/pre-approvals/${requestId}/status`, "PATCH", { status: "IN_REVIEW" });
+await api(complianceToken, `/pre-approvals/${requestId}/status`, "PATCH", {
+  status: "APPROVED_WITH_CONDITIONS",
+  compliance_opinion: "Aprovada com limite de R$ 20.000 e reporte da execução no mesmo dia.",
+});
 
 await login(page, "compliance@demo.local");
 await page.goto(`${appUrl}/pre-approvals/${requestId}`);
-await page.getByPlaceholder("Adicionar comentário…").fill("Documentação e limites conferidos conforme a política vigente.");
-await page.getByRole("button", { name: "Enviar comentário" }).click();
-await page.getByText("Documentação e limites conferidos conforme a política vigente.").waitFor();
-
-await page.getByRole("button", { name: "Atualizar status" }).click();
-await page.getByLabel("Status").selectOption("IN_REVIEW");
-await page.getByRole("button", { name: "Confirmar decisão" }).click();
-await page.getByRole("button", { name: "Registrar decisão" }).click();
-await page.getByText("Em análise", { exact: true }).waitFor();
-
-await page.getByRole("button", { name: "Atualizar status" }).click();
-await page.getByLabel("Status").selectOption("APPROVED_WITH_CONDITIONS");
-await page.getByLabel("Parecer do compliance").fill("Aprovada com limite de R$ 20.000 e reporte da execução no mesmo dia.");
-await page.getByRole("button", { name: "Confirmar decisão" }).click();
-await page.getByRole("button", { name: "Registrar decisão" }).click();
 await page.getByText("Aprovado c/ ressalvas", { exact: true }).waitFor();
 await page.evaluate(() => window.scrollTo(0, 0));
 await screenshot(page, "pre-approval-detail.png");
