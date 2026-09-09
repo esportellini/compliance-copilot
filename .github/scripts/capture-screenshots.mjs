@@ -117,7 +117,7 @@ await screenshot(page, "dashboard.png");
 await login(page, "auditor@demo.local");
 await page.goto(`${appUrl}/audit`);
 await page.getByRole("heading", { name: "Trilha de Auditoria" }).waitFor();
-await page.getByText("PRE_APPROVAL_DECISION", { exact: true }).first().waitFor();
+await page.locator("tbody tr").first().waitFor();
 await screenshot(page, "audit-trail.png");
 
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
