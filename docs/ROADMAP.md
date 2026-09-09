@@ -1,6 +1,6 @@
 # Roadmap
 
-## v1.0 — MVP (current)
+## v1.0 — Public portfolio release
 
 - [x] Authentication (JWT + bcrypt)
 - [x] RBAC (Admin / Compliance / Employee / Auditor)
@@ -18,35 +18,14 @@
 - [x] Reproducible Docker Compose setup with Alembic bootstrap
 - [x] Linux CI for backend and frontend quality gates
 
-## v1.1 — Notifications
+## Possible next steps
 
-- [ ] Email notifications for pre-approval status changes
-- [ ] In-app notification bell
-- [ ] Compliance digest email (daily/weekly summary)
-- [ ] Webhook support for external integrations
+- Notifications for pre-approval status changes.
+- SSO, MFA, rate limiting and deployment-specific security controls.
+- Multi-tenant data isolation and finer-grained permissions.
+- External restricted-list integrations and signed audit exports.
+- A dedicated vector store only if corpus size and measured retrieval quality
+  justify the additional operational complexity.
 
-## v1.2 — Enhanced RAG
-
-- [ ] Switch from JSONB to pgvector for embedding storage
-- [x] Hybrid ranking when real OpenAI embeddings are available
-- [ ] Re-ranking step before answer generation
-- [ ] Chunk overlap for better context continuity
-- [ ] Support for larger documents (streaming extraction)
-
-## v1.3 — Advanced Compliance
-
-- [ ] Multi-firm support (tenancy)
-- [ ] Rule templates library
-- [ ] Scheduled rule evaluation reports
-- [ ] Integration with CVM/B3 restricted list feeds
-- [ ] Pre-trade compliance check API
-
-## v2.0 — Enterprise
-
-- [ ] SSO (SAML / OIDC)
-- [ ] Fine-grained permissions at department level
-- [ ] Workflow engine for multi-step approvals
-- [ ] External audit export (PDF with digital signature)
-- [ ] MFA for admin actions
-- [ ] Rate limiting per user (Redis-backed)
-- [ ] Horizontal scaling (stateless backend)
+These are product options, not commitments. The current release deliberately
+keeps retrieval lightweight and the decision path deterministic.

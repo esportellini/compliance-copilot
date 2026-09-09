@@ -24,7 +24,8 @@
 
 ## Secrets Management
 
-- All secrets via environment variables — no hardcoded values
+- Runtime secrets are supplied through environment variables. The only
+  hardcoded credential is the public, fictional demo password documented below.
 - `.env` is in `.gitignore` and never committed
 - `SECRET_KEY` must be generated per environment: `python -c "import secrets; print(secrets.token_hex(32))"`
 

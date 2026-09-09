@@ -47,7 +47,8 @@ demo data.
 - The frontend uses Next.js 14, React, TypeScript, Tailwind CSS, TanStack Query,
   Lucide and Recharts. No new UI framework or backend endpoint is planned.
 - Portuguese product language must remain concise, consistent and professional.
-- The current phase changes visual design and frontend composition only.
+- The public portfolio release is feature-complete; future work should preserve
+  these boundaries unless a requirement explicitly changes them.
 
 ## Brand Commitments
 
@@ -62,9 +63,9 @@ demo data.
 
 The repository contains working API integrations, role-scoped navigation,
 fictional demo accounts, seeded example products and policies, and complete
-Employee, Compliance, Auditor and Admin flows. No customer claims, production
-deployment claims, screenshots or external brand assets are available and none
-should be invented.
+Employee, Compliance, Auditor and Admin flows. Public documentation must use
+only behavior demonstrated by the code and fictional data; it must not imply
+customer adoption or production deployment.
 
 ## Product Principles
 

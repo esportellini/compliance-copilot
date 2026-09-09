@@ -94,7 +94,7 @@ Authorization: Bearer <access_token>
 | GET | `/users/{id}` | User detail (admin) |
 | PATCH | `/users/{id}` | Update user (admin) |
 | PATCH | `/users/{id}/deactivate` | Deactivate (admin) |
-| GET | `/settings` | List settings (admin/compliance/auditor) |
+| GET | `/settings` | List settings (all authenticated roles; read-only outside admin) |
 | PUT | `/settings/{key}` | Update setting (admin) |
 | GET | `/dashboard` | Dashboard metrics |
 | GET | `/training` | Training items |
