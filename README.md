@@ -26,6 +26,10 @@ pre-approval workflow.
 **Rules decide. Retrieval provides evidence. AI explains. Humans approve when
 required. Everything important is auditable.**
 
+Version 1.1 adds operational provenance: the system can show the exact rule and
+document versions behind a historical answer, then operate the resulting review
+queue without changing this decision boundary.
+
 The LLM never selects or changes the structured decision. Hard restrictions and
 the rules engine are authoritative. Offline retrieval uses deterministic lexical
 BM25; optional OpenAI embeddings can refine ranking, and the provider can only
@@ -80,6 +84,21 @@ comments, timestamps, an initial decision snapshot, and a final opinion.
 
 ![Pre-approval workflow](docs/assets/pre-approval-detail.png)
 
+Versioned rules preserve the policy state used by every decision, including
+priority and condition snapshots.
+
+![Rule version history](docs/assets/rule-version-history.png)
+
+The approval queue records a fixed due date from the configured SLA and puts
+overdue and due-soon work first.
+
+![Operational approval queue](docs/assets/approval-queue.png)
+
+Authorized users can export a structured JSON or paginated PDF audit package
+from any request, including requests still in progress.
+
+![Pre-approval audit package](docs/assets/audit-package.png)
+
 ### Auditability
 
 Relevant actions remain available to authorized oversight roles through the
@@ -104,12 +123,16 @@ with the repository's official fictional seed data.
 ## Key features
 
 - Deterministic rule evaluation with strict numeric priority.
+- Versioned rules with effective dates and immutable decision provenance.
 - Terminal product-status and restricted-list checks.
 - Canonical product resolution without ambiguous fallback.
 - PDF, DOCX, and TXT ingestion with page and section metadata.
 - Deterministic BM25 retrieval with an explicit relevance gate.
 - Optional OpenAI explanation and embedding refinement.
 - Linked pre-approval workflow with comments and a guarded state machine.
+- SLA-prioritized approval queue and private in-app notifications.
+- Previewed, atomic restricted-list CSV import and CSV export.
+- Structured JSON and paginated PDF audit packages.
 - Role-based access for Admin, Compliance, Employee, and read-only Auditor.
 - Role-scoped dashboard, reports, history, and append-only audit trail.
 - Reproducible Docker images, Alembic bootstrap, and Linux CI.
@@ -186,7 +209,7 @@ insecure. Never reuse them outside the local demo.
 
 ## Tests and quality
 
-The release has **135 backend tests**. The suite verifies decision semantics,
+The release has **144 backend tests**. The suite verifies decision semantics,
 retrieval fallbacks, product resolution, API metadata, RBAC, approval state
 transitions, isolation, deterministic seed behavior, and Alembic/model parity.
 
@@ -207,9 +230,9 @@ npm run lint
 npm run build
 ```
 
-GitHub Actions runs the backend suite, Alembic schema and PostgreSQL offline-SQL
-checks, Compose configuration validation, typecheck, lint, and the complete
-Next.js production build on Linux for every push and pull request.
+GitHub Actions runs the backend suite, the real PostgreSQL v1.0-to-v1.1 Alembic
+upgrade, schema and offline-SQL checks, Compose configuration validation,
+typecheck, lint, and the complete Next.js production build on Linux.
 
 ## Design decisions
 
@@ -226,18 +249,18 @@ Next.js production build on Linux for every push and pull request.
 ## Limitations
 
 - This is an educational portfolio project with fictional policies and data.
-- There is no rate limiting, MFA, SSO, notification service, or multi-tenancy.
+- There is no rate limiting, MFA, SSO, external notification delivery, or multi-tenancy.
 - Optional embeddings are stored as JSONB and ranked in process.
 - PDF extraction requires selectable text; OCR is not implemented.
 - Copilot-query retention is not automated.
 - A real deployment requires independent security, privacy, legal, and
   compliance review.
 
-## Roadmap
+## Project status
 
-Possible next steps include notifications, enterprise identity controls,
-multi-tenant isolation, and external restricted-list integrations. They are
-documented in the short [roadmap](docs/ROADMAP.md) and are outside this release.
+Version 1.1.0 is the final planned portfolio release. Enterprise identity,
+multi-tenancy, external market-data integrations, and distributed retrieval are
+intentionally outside the project scope. See [project status](docs/ROADMAP.md).
 
 ## Disclaimer
 

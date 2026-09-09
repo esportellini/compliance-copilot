@@ -33,7 +33,10 @@ uma decisão quando nenhuma regra é aplicável.
    └── status do produto é BLOCKED ou RESTRICTED
        Resultado: RESTRICTED terminal
 
-2. Regras configuradas e ativas
+2. Versões de regras elegíveis
+   ├── status ACTIVE
+   ├── effective_from <= instante da avaliação
+   ├── effective_to ausente ou posterior ao instante da avaliação
    ├── filtrar por product_type e condições
    ├── encontrar o menor valor de priority aplicável
    ├── ignorar todas as prioridades numericamente maiores
@@ -95,3 +98,16 @@ decisão humana antes de prosseguir.
 - A orientação operacional de `next_action` é determinística. Se uma explicação
   gerada contiver contradição operacional óbvia, ela é substituída por uma
   explicação determinística segura sem alterar a decisão.
+
+## Versionamento e proveniência
+
+O versionamento acontece antes do motor. Cada regra lógica usa um `rule_key`
+estável e versões `DRAFT`, `ACTIVE` ou `ARCHIVED`. DRAFT pode ser corrigida em
+seu próprio registro; editar uma versão publicada cria uma nova versão e preserva
+a anterior. Apenas versões ACTIVE e efetivas são convertidas em `RuleSpec`.
+
+O motor puro continua sem conhecer banco, lifecycle ou datas e sua precedência
+permanece idêntica. Ao persistir a resposta, o serviço grava um snapshot
+estruturado das regras vencedoras com ID, chave, versão, nome, prioridade,
+decisão e condição. O histórico lê esse snapshot; nunca tenta inferi-lo da versão
+atual da regra.
