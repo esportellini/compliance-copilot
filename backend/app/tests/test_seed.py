@@ -1,4 +1,7 @@
 """The demo seed must produce the documented scenarios and own its demo data."""
+from contextlib import redirect_stdout
+from io import BytesIO, TextIOWrapper
+
 from app.models.document import DocumentChunk, PolicyDocument
 from app.models.product import FinancialProduct
 from app.models.restricted import RestrictedListItem
@@ -8,6 +11,17 @@ from app.models.training import TrainingItem
 from app.models.user import User
 from app.seed import seed
 from app.services.copilot import CopilotInput, run_query
+
+
+def test_seed_cli_output_is_safe_for_windows_cp1252(db):
+    output = BytesIO()
+    stream = TextIOWrapper(output, encoding="cp1252", errors="strict")
+
+    with redirect_stdout(stream):
+        seed(db)
+    stream.flush()
+
+    assert b"Seed concluido com sucesso." in output.getvalue()
 
 
 def test_seeded_policy_supports_all_demo_decisions(db):

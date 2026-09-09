@@ -56,7 +56,8 @@ class DocumentChunk(Base, TimestampMixin):
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     section_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     content: Mapped[str] = mapped_column(Text)
-    # embedding como JSON list de floats; swap para pgvector.Vector em produção
+    # Optional real-provider embedding stored as JSON; lexical BM25 remains the
+    # deterministic retrieval baseline.
     embedding: Mapped[list | None] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite"), nullable=True
     )

@@ -246,7 +246,7 @@ def seed(db: Session) -> None:
              "Use o Copilot apenas para consultas relacionadas ao seu trabalho. Não tente 'enganar' o sistema com perguntas ambíguas. Lembre-se: todas as consultas são registradas e podem ser auditadas.",
              "ETICA"),
         (11, "Privacidade e LGPD",
-             "Suas consultas são armazenadas para fins de auditoria regulatória (base legal: obrigação legal). Você pode solicitar ao administrador a exportação ou anonimização dos seus dados a qualquer momento. Não inserimos dados desnecessários e não treinamos modelos externos com seu histórico.",
+             "Suas consultas são armazenadas para fins de auditoria conforme a política definida pela organização. Você pode solicitar ao administrador a exportação ou anonimização dos seus dados a qualquer momento. Não inserimos dados desnecessários e não treinamos modelos externos com seu histórico.",
              "PRIVACIDADE"),
     ]
     for order, title, body, cat in training_data:
@@ -261,7 +261,9 @@ def seed(db: Session) -> None:
     db.flush()
 
     db.commit()
-    print("✓ Seed concluído com sucesso.")
+    # Keep CLI output ASCII-safe because the seed is part of the documented
+    # Windows setup flow and some PowerShell sessions still use cp1252.
+    print("Seed concluido com sucesso.")
     print(f"  Senha demo: {DEMO_PASSWORD}")
     for ud in users_data:
         print(f"  {ud['role']:12s}  {ud['email']}")
