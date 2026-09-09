@@ -56,7 +56,7 @@ await page.getByText("UPDATE", { exact: true }).waitFor();
 await shot(page, "restricted-list-import.png");
 
 await page.goto(`${appUrl}/pre-approvals`);
-await page.getByText("Vence em breve", { exact: true }).waitFor();
+await page.getByRole("cell", { name: "Vence em breve" }).waitFor();
 await shot(page, "approval-queue.png");
 
 await api(complianceToken, `/pre-approvals/${request.id}/status`, "PATCH", { status: "IN_REVIEW" });
