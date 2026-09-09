@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_admin, require_compliance
+from app.api.deps import get_current_user, require_admin
 from app.core.permissions import Role
 from app.db.session import get_db
 from app.models.setting import SystemSetting

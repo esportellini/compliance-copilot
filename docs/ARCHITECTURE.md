@@ -29,7 +29,7 @@ app/
 ├── schemas/              # Pydantic v2 request/response schemas
 ├── services/
 │   ├── rules_engine.py   # Pure deterministic rules evaluator
-│   ├── rag.py            # Chunking + embedding + retrieval
+│   ├── rag.py            # Structured chunking + BM25/hybrid retrieval
 │   ├── ai_provider.py    # AI abstraction (mock / OpenAI)
 │   ├── copilot.py        # Orchestration: rules → RAG → AI → persist
 │   └── audit.py          # AuditLog helpers + SystemSettings
@@ -45,15 +45,13 @@ User question
 ┌─────────────────────────────────────────────────┐
 │  Copilot Service (copilot.py)                    │
 │                                                  │
-│  1. Out-of-scope detection (regex)               │
-│  2. Product resolution (by ID or name hint)      │
-│  3. Restricted list check                        │
-│  4. Rules Engine → AUTHORITATIVE decision        │
-│  5. RAG retrieval → supporting chunks            │
-│  6. Source enforcement (no source = INCONCLUSIVE)│
-│  7. Document conflict check                      │
-│  8. AI Provider → justification text only       │
-│  9. Persist: query + answer + sources + audit    │
+│  1. Resolve product by ID or exact normalized key │
+│  2. Check hard restrictions for concrete product │
+│  3. Apply the out-of-scope gate                   │
+│  4. Rules Engine → AUTHORITATIVE decision         │
+│  5. RAG retrieval → supporting evidence           │
+│  6. AI Provider → explanation of that decision    │
+│  7. Persist: query + answer + sources + audit      │
 └─────────────────────────────────────────────────┘
      │
      ▼
@@ -80,9 +78,21 @@ User ──────────────┬── CopilotQuery ── Cop
                    └── UserTrainingAcknowledgement
 
 FinancialProduct ──── CopilotQuery
+CopilotQuery ──────── PreApprovalRequest (optional trace, ON DELETE SET NULL)
 ComplianceRule   (evaluated by rules engine, not FK-linked to queries)
-PolicyDocument ────── DocumentChunk (embedding JSONB)
-AuditLog         (append-only, no FK constraints to allow retention)
+PolicyDocument ────── DocumentChunk (optional embedding stored as JSONB)
+AuditLog         (append-only in normal flows; optional user reference)
 SystemSetting    (key-value store for runtime configuration)
 RestrictedListItem
 ```
+
+## Database bootstrap
+
+Alembic is the only schema bootstrap for application databases. The official
+Compose command runs `alembic upgrade head` before starting Uvicorn and aborts
+if migration fails. The seed assumes the schema is already migrated and only
+upserts fictional demo data.
+
+Tests are intentionally separate: their isolated in-memory SQLite fixture uses
+`Base.metadata.create_all` and drops the schema after each test. That fixture is
+test infrastructure and is never imported by runtime, development or demo code.

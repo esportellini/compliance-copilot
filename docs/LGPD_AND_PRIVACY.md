@@ -4,11 +4,15 @@
 
 | Data Category           | Legal Basis          | Retention     |
 |-------------------------|----------------------|---------------|
-| User credentials        | Legítimo interesse   | While active  |
-| Copilot queries         | Obrigação legal      | Configurable  |
-| Pre-approvals           | Obrigação legal      | Configurable  |
-| Audit logs              | Obrigação legal      | Configurable  |
-| Training acknowledgements | Legítimo interesse | While employed|
+| User credentials        | Define per deployment | Administrative anonymization available |
+| Copilot queries         | Define per deployment | No automated deletion in this version |
+| Pre-approvals           | Define per deployment | No automated deletion in this version |
+| Audit logs              | Define per deployment | Configurable cleanup with protected events |
+| Training acknowledgements | Define per deployment | No automated deletion in this version |
+
+The legal basis and retention period depend on the deploying organization and
+must be approved by its privacy and legal teams. This demo does not determine
+them.
 
 ## Data Subject Rights (Art. 18 LGPD)
 
@@ -50,8 +54,9 @@ Protected events that are **never** auto-deleted:
 - **Mock provider (default)**: fully offline, no data leaves the system.
 - **OpenAI provider**: query text and retrieved policy excerpts are sent to
   OpenAI API. Users should be informed per their privacy notice.
-- Prompts are stored in `copilot_queries` for audit purposes.
-  Retention is governed by `query_retention_days` setting.
+- Prompts are stored in `copilot_queries` for audit purposes. Automated query
+  deletion is not implemented in this version; deployments need an approved
+  retention procedure before production use.
 
 ## Anonymization Process
 

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_global_view
+from app.api.deps import require_global_view
 from app.core.permissions import Role
 from app.db.session import get_db
 from app.models.audit import AuditLog

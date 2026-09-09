@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
-from app.db.init_db import init_db
 from app.db.session import SessionLocal
 from app.models.document import PolicyDocument
 from app.models.product import FinancialProduct
@@ -269,7 +268,6 @@ def seed(db: Session) -> None:
 
 
 def main():
-    init_db()
     db = SessionLocal()
     try:
         seed(db)

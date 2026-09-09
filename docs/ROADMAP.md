@@ -5,7 +5,7 @@
 - [x] Authentication (JWT + bcrypt)
 - [x] RBAC (Admin / Compliance / Employee / Auditor)
 - [x] Deterministic rules engine
-- [x] RAG with offline mock embeddings
+- [x] Deterministic offline BM25 retrieval with optional OpenAI embeddings
 - [x] Copilot query flow with decision + justification + sources
 - [x] Product catalog with restricted/blocked status
 - [x] Policy document upload (PDF, DOCX, TXT) + chunking
@@ -14,8 +14,9 @@
 - [x] Reports and dashboard
 - [x] LGPD module (export, anonymization, retention)
 - [x] Training and onboarding module
-- [x] System settings (IA, Compliance, Security, LGPD)
-- [x] Docker Compose local setup
+- [x] Runtime setting for audit-log retention
+- [x] Reproducible Docker Compose setup with Alembic bootstrap
+- [x] Linux CI for backend and frontend quality gates
 
 ## v1.1 — Notifications
 
@@ -27,7 +28,7 @@
 ## v1.2 — Enhanced RAG
 
 - [ ] Switch from JSONB to pgvector for embedding storage
-- [ ] Hybrid search (BM25 + vector)
+- [x] Hybrid ranking when real OpenAI embeddings are available
 - [ ] Re-ranking step before answer generation
 - [ ] Chunk overlap for better context continuity
 - [ ] Support for larger documents (streaming extraction)

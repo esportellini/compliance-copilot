@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.permissions import Role
 from app.db.session import get_db
-from app.models.copilot import CopilotAnswer, CopilotQuery
+from app.models.copilot import CopilotQuery
 from app.models.product import FinancialProduct
 from app.models.user import User
 from app.schemas.copilot import (

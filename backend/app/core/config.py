@@ -23,13 +23,6 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
 
-    # rate limiting (requests per window)
-    login_rate_limit: int = 10      # max login attempts per minute per IP
-    copilot_rate_limit: int = 30    # max copilot queries per minute per user
-
-    # upload
-    max_upload_bytes: int = 20 * 1024 * 1024  # 20 MB
-
     # cors — comma-separated list
     cors_origins: str = "http://localhost:3000"
 

@@ -9,7 +9,6 @@ from app.api.deps import get_current_user, require_admin
 from app.core.permissions import Role
 from app.core.security import hash_password
 from app.db.session import get_db
-from app.models.audit import AuditLog
 from app.models.copilot import CopilotAnswer, CopilotQuery
 from app.models.document import PolicyDocument
 from app.models.pre_approval import PreApprovalRequest

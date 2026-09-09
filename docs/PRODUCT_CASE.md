@@ -40,10 +40,14 @@ change the engine's decision, which is always authoritative.
 ## Key Design Decisions
 
 1. **Rules engine is authoritative** — the LLM cannot override RESTRICTED.
-2. **No source = INCONCLUSIVE** — the system never guesses without evidence.
-3. **Offline mode** — works fully without any external API key (mock provider).
+2. **Rules and evidence remain separate** — missing RAG evidence never changes a
+   structured decision, and irrelevant excerpts are omitted.
+3. **Offline mode** — deterministic lexical BM25 retrieval and a mock explanation
+   provider work without external API keys.
 4. **Append-only audit** — logs cannot be deleted by normal operation.
-5. **LGPD-compliant** — anonymization, export, and retention built in.
+5. **Privacy operations** — administrative anonymization and export plus
+   configurable audit-log retention; production still requires an approved
+   privacy and retention policy.
 
 ## Target Users
 

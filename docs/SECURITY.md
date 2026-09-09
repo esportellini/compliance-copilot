@@ -5,7 +5,7 @@
 - **Protocol**: JWT Bearer (HS256)
 - **Library**: PyJWT 2.x
 - **Token expiry**: Configurable via `ACCESS_TOKEN_EXPIRE_MINUTES` (default: 8h)
-- **Password hashing**: bcrypt via `passlib` / `bcrypt` library
+- **Password hashing**: bcrypt via the `bcrypt` library
 
 ## Authorization (RBAC)
 
@@ -43,7 +43,8 @@
 
 ## Audit Trail
 
-- Every state mutation generates an `AuditLog` entry
+- Principal domain operations and security-sensitive mutations generate an
+  `AuditLog` entry
 - Logs are append-only in normal operation
 - Retention policy removes non-critical logs after configured days
 - Protected events (anonymization, blocking, pre-approval decisions) are never auto-deleted
@@ -55,5 +56,9 @@
 - [ ] Set `CORS_ORIGINS` to exact domain
 - [ ] Configure HTTPS (reverse proxy: nginx / Caddy)
 - [ ] Set `AI_PROVIDER=openai` and provide `OPENAI_API_KEY` if using LLM
-- [ ] Review `data_retention_days` and `session_expire_minutes` settings
-- [ ] Enable pgvector for production-scale embedding search
+- [ ] Review the `data_retention_days` setting
+- [ ] Evaluate a dedicated vector store only if production scale requires it
+
+The accounts under `@demo.local` and their shared password are fictional,
+public demo credentials. They are intentionally insecure and must never be
+copied to a real environment.

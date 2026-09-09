@@ -10,7 +10,7 @@ from app.models.user import User
 from app.schemas.document import ChunkOut, DocumentOut, DocumentUpdate
 from app.services.audit import log_event
 from app.services.extractor import ExtractedPage, extract_text
-from app.services.rag import index_document, index_document_from_pages
+from app.services.rag import index_document_from_pages
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
