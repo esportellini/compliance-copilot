@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -31,6 +32,7 @@ class RuleCondition(BaseModel):
 
 
 class RuleBase(BaseModel):
+    rule_key: str | None = Field(default=None, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
     name: str
     description: str | None = None
     product_type: str | None = None
@@ -39,6 +41,9 @@ class RuleBase(BaseModel):
     risk: RiskLevel = RiskLevel.MEDIUM
     priority: int = 100
     is_active: bool = True
+    status: str = Field(default="ACTIVE", pattern=r"^(DRAFT|ACTIVE|ARCHIVED)$")
+    effective_from: datetime | None = None
+    effective_to: datetime | None = None
 
 
 class RuleCreate(RuleBase):
@@ -54,10 +59,17 @@ class RuleUpdate(BaseModel):
     risk: RiskLevel | None = None
     priority: int | None = None
     is_active: bool | None = None
+    status: str | None = Field(default=None, pattern=r"^(DRAFT|ACTIVE|ARCHIVED)$")
+    effective_from: datetime | None = None
+    effective_to: datetime | None = None
 
 
 class RuleOut(RuleBase):
     id: int
+    version: int
+    created_by: int | None = None
+    created_at: datetime
+    updated_at: datetime
 
     model_config = {"from_attributes": True}
 

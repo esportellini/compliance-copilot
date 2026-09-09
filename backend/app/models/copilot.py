@@ -41,6 +41,9 @@ class CopilotAnswer(Base, TimestampMixin):
     matched_rules: Mapped[list | None] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite"), default=list
     )
+    rule_provenance: Mapped[list | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), default=list
+    )
 
     query = relationship("CopilotQuery", back_populates="answer")
     sources = relationship(
@@ -64,5 +67,6 @@ class SourceReference(Base, TimestampMixin):
     score: Mapped[float] = mapped_column(Float, default=0.0)
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     section_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    document_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     answer = relationship("CopilotAnswer", back_populates="sources")

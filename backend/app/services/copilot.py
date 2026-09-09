@@ -21,7 +21,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from sqlalchemy import func
+from datetime import datetime, timezone
+
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.identifiers import normalize_identifier, normalized_identifier_expression
@@ -89,6 +91,7 @@ class CopilotResult:
     next_action: str | None = None
     requires_human_review: bool = False
     matched_rules: list[str] = field(default_factory=list)
+    rule_provenance: list[dict] = field(default_factory=list)
     out_of_scope: bool = False
 
 
@@ -105,8 +108,16 @@ def _is_out_of_scope(question: str) -> bool:
     return not bool(_SCOPE_TERMS.search(question))
 
 
-def _load_rules(db: Session) -> list[RuleSpec]:
-    rows = db.query(ComplianceRule).filter(ComplianceRule.is_active == True).all()  # noqa: E712
+def _eligible_rule_rows(db: Session, evaluated_at: datetime) -> list[ComplianceRule]:
+    return db.query(ComplianceRule).filter(
+        ComplianceRule.is_active == True,  # noqa: E712
+        ComplianceRule.status == "ACTIVE",
+        ComplianceRule.effective_from <= evaluated_at,
+        or_(ComplianceRule.effective_to.is_(None), ComplianceRule.effective_to > evaluated_at),
+    ).all()
+
+
+def _load_rules(rows: list[ComplianceRule]) -> list[RuleSpec]:
     return [
         RuleSpec(
             name=r.name,
@@ -117,6 +128,27 @@ def _load_rules(db: Session) -> list[RuleSpec]:
             condition=r.condition or {},
         )
         for r in rows
+    ]
+
+
+def _provenance(rows: list[ComplianceRule], matched_names: list[str]) -> list[dict]:
+    matched = set(matched_names)
+    candidates = [row for row in rows if row.name in matched]
+    if not candidates:
+        return []
+    winning_priority = min(row.priority for row in candidates)
+    return [
+        {
+            "rule_id": row.id,
+            "rule_key": row.rule_key,
+            "version": row.version,
+            "name": row.name,
+            "priority": row.priority,
+            "decision": row.decision,
+            "condition": row.condition or {},
+        }
+        for row in sorted(candidates, key=lambda item: (item.name, item.id or 0))
+        if row.priority == winning_priority
     ]
 
 
@@ -314,7 +346,10 @@ def run_query(inp: CopilotInput, db: Session) -> CopilotResult:
             on_restricted_list=resolution.on_restricted_list,
             amount=inp.amount,
         )
-        result = evaluate(ctx, _load_rules(db))
+        rule_rows = _eligible_rule_rows(db, datetime.now(timezone.utc))
+        result = evaluate(ctx, _load_rules(rule_rows))
+
+    rule_provenance = _provenance(rule_rows, result.matched_rules) if resolution.error is None else []
 
     # 5. RAG
     search_query = build_retrieval_query(
@@ -376,6 +411,7 @@ def run_query(inp: CopilotInput, db: Session) -> CopilotResult:
         next_action=_NEXT_ACTION.get(result.decision),
         requires_human_review=result.requires_human_review,
         matched_rules=result.matched_rules,
+        rule_provenance=rule_provenance,
     )
     db.add(answer_row)
     db.flush()
@@ -390,6 +426,7 @@ def run_query(inp: CopilotInput, db: Session) -> CopilotResult:
             score=chunk.score,
             page_number=chunk.page_number,
             section_title=chunk.section_title,
+            document_version=chunk.document_version,
         ))
 
     log_event(
@@ -420,6 +457,7 @@ def run_query(inp: CopilotInput, db: Session) -> CopilotResult:
                 "score": c.score,
                 "page_number": c.page_number,
                 "section_title": c.section_title,
+                "document_version": c.document_version,
             }
             for c in chunks
         ],
@@ -428,4 +466,5 @@ def run_query(inp: CopilotInput, db: Session) -> CopilotResult:
         next_action=_NEXT_ACTION.get(result.decision),
         requires_human_review=result.requires_human_review,
         matched_rules=result.matched_rules,
+        rule_provenance=rule_provenance,
     )

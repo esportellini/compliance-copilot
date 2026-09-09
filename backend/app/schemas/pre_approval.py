@@ -58,6 +58,8 @@ class PreApprovalOut(BaseModel):
     reviewer: str | None
     decided_at: datetime | None
     review_started_at: datetime | None
+    due_at: datetime | None
+    sla_status: str
     created_at: datetime
     updated_at: datetime
     comments: list[CommentOut] = []

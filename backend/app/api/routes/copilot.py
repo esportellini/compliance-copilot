@@ -48,6 +48,7 @@ def query_copilot(
         next_action=result.next_action,
         requires_human_review=result.requires_human_review,
         matched_rules=result.matched_rules,
+        rule_provenance=result.rule_provenance,
         out_of_scope=result.out_of_scope,
     )
 
@@ -153,6 +154,7 @@ def history_detail(
                     score=s.score,
                     page_number=s.page_number,
                     section_title=s.section_title,
+                    document_version=s.document_version,
                 )
                 for s in ans.sources
             ],
@@ -161,5 +163,6 @@ def history_detail(
             next_action=ans.next_action,
             requires_human_review=ans.requires_human_review,
             matched_rules=ans.matched_rules or [],
+            rule_provenance=ans.rule_provenance or [],
         ),
     )

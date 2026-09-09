@@ -22,8 +22,19 @@ class SourceOut(BaseModel):
     score: float
     page_number: int | None = None
     section_title: str | None = None
+    document_version: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class RuleMatchReference(BaseModel):
+    rule_id: int
+    rule_key: str
+    version: int
+    name: str
+    priority: int
+    decision: str
+    condition: dict
 
 
 class CopilotAnswerOut(BaseModel):
@@ -37,6 +48,7 @@ class CopilotAnswerOut(BaseModel):
     next_action: str | None = None
     requires_human_review: bool
     matched_rules: list[str] = []
+    rule_provenance: list[RuleMatchReference] = []
     out_of_scope: bool = False
 
 

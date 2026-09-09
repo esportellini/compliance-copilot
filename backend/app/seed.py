@@ -124,14 +124,14 @@ def seed(db: Session) -> None:
 
     # ── rules ────────────────────────────────────────────────────────────
     rules_data = [
-        {"name": "Fundos abertos permitidos", "product_type": "OPEN_FUND", "decision": "ALLOWED",
+        {"rule_key": "open-funds-allowed", "name": "Fundos abertos permitidos", "product_type": "OPEN_FUND", "decision": "ALLOWED",
          "risk": "LOW", "priority": 10, "description": "Fundos abertos permitidos por padrão."},
-        {"name": "Fundos abertos > 100k reportar", "product_type": "OPEN_FUND",
+        {"rule_key": "open-funds-report-threshold", "name": "Fundos abertos > 100k reportar", "product_type": "OPEN_FUND",
          "condition": {"amount_gt": 100000}, "decision": "REPORT_REQUIRED",
          "risk": "MEDIUM", "priority": 5, "description": "Operações acima de R$100k devem ser reportadas."},
-        {"name": "Ações exigem pré-aprovação", "product_type": "STOCK", "decision": "PRE_APPROVAL_REQUIRED",
+        {"rule_key": "personal-stock-trading", "name": "Ações exigem pré-aprovação", "product_type": "STOCK", "decision": "PRE_APPROVAL_REQUIRED",
          "risk": "MEDIUM", "priority": 10, "description": "Toda operação com ações requer pré-aprovação."},
-        {"name": "Criptoativos restritos", "product_type": "CRYPTO", "decision": "RESTRICTED",
+        {"rule_key": "crypto-restricted", "name": "Criptoativos restritos", "product_type": "CRYPTO", "decision": "RESTRICTED",
          "risk": "HIGH", "priority": 10, "description": "Criptoativos vedados pela política interna."},
     ]
     active_rule_names = {rule["name"] for rule in rules_data}
@@ -139,8 +139,9 @@ def seed(db: Session) -> None:
         legacy = db.query(ComplianceRule).filter(ComplianceRule.name == legacy_name).first()
         if legacy and legacy_name not in active_rule_names:
             legacy.is_active = False
+            legacy.status = "ARCHIVED"
     for rd in rules_data:
-        data = {**rd, "condition": rd.get("condition", {}), "is_active": True}
+        data = {**rd, "condition": rd.get("condition", {}), "is_active": True, "status": "ACTIVE", "version": 1, "effective_from": datetime(2026, 1, 1, tzinfo=timezone.utc)}
         configured_rule = db.query(ComplianceRule).filter(
             ComplianceRule.name == rd["name"]
         ).first()
@@ -181,6 +182,7 @@ def seed(db: Session) -> None:
     # ── system settings ───────────────────────────────────────────────────
     settings_data = [
         ("data_retention_days",      "730",    "Dias de retenção de logs de auditoria (LGPD)"),
+        ("pre_approval_sla_hours",   "48",     "SLA capturado na criação de cada pré-aprovação"),
     ]
     obsolete_setting_keys = {
         "human_review_threshold",

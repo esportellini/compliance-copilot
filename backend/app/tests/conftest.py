@@ -47,6 +47,7 @@ def engine():
     # import all models so metadata is populated
     import app.models.audit, app.models.copilot, app.models.document  # noqa: F401
     import app.models.pre_approval, app.models.product, app.models.restricted  # noqa: F401
+    import app.models.notification  # noqa: F401
     import app.models.rule, app.models.setting, app.models.training, app.models.user  # noqa: F401
     from app.db.base import Base
     Base.metadata.create_all(bind=eng)

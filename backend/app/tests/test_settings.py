@@ -14,4 +14,4 @@ def test_settings_api_exposes_only_runtime_controls_with_consumers(
         for section in response.json()["sections"]
         for setting in section["settings"]
     }
-    assert keys == {"data_retention_days"}
+    assert keys == {"data_retention_days", "pre_approval_sla_hours"}

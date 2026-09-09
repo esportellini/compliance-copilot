@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -14,7 +15,9 @@ from app.schemas.pre_approval import (
     CommentCreate, CommentOut, PreApprovalCreate,
     PreApprovalOut, PreApprovalStatusUpdate,
 )
-from app.services.audit import log_event
+from app.services.audit import get_setting, log_event
+from app.services.notifications import notify_roles, notify_user
+from app.services.audit_package import build_audit_package, render_audit_package_pdf
 
 router = APIRouter(prefix="/pre-approvals", tags=["pre-approvals"])
 
@@ -47,16 +50,47 @@ def _scoped(db: Session, user: User):
     return q
 
 
+def _exportable(req_id: int, db: Session, user: User) -> PreApprovalRequest:
+    row = db.get(PreApprovalRequest, req_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Solicitação não encontrada")
+    if Role(user.role) == Role.EMPLOYEE and row.requester_id != user.id:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    return row
+
+
+@router.get("/{req_id}/audit-package.json")
+def audit_package_json(req_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return build_audit_package(db, _exportable(req_id, db, user))
+
+
+@router.get("/{req_id}/audit-package.pdf")
+def audit_package_pdf(req_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    content = render_audit_package_pdf(build_audit_package(db, _exportable(req_id, db, user)))
+    return Response(content, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=pre-approval-{req_id}-audit-package.pdf"})
+
+
 @router.get("", response_model=list[PreApprovalOut])
 def list_pre_approvals(
     status: str | None = Query(default=None),
+    sla: str | None = Query(default=None),
+    requester: int | None = Query(default=None),
+    product: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     q = _scoped(db, user)
     if status:
         q = q.filter(PreApprovalRequest.status == status)
-    return q.order_by(PreApprovalRequest.created_at.desc()).all()
+    if requester is not None:
+        q = q.filter(PreApprovalRequest.requester_id == requester)
+    if product:
+        q = q.filter(PreApprovalRequest.product_label.ilike(f"%{product}%"))
+    rows = q.all()
+    if sla:
+        rows = [row for row in rows if row.sla_status == sla]
+    order = {"OVERDUE": 0, "DUE_SOON": 1, "ON_TIME": 2, "COMPLETED": 3}
+    return sorted(rows, key=lambda row: (order[row.sla_status], -(row.created_at.timestamp())))
 
 
 @router.get("/{req_id}", response_model=PreApprovalOut)
@@ -124,6 +158,12 @@ def create_pre_approval(
         if product.identifier:
             product_label = f"{product.name} ({product.identifier})"
 
+    now = datetime.now(timezone.utc)
+    try:
+        sla_hours = int(get_setting(db, "pre_approval_sla_hours", "48") or "48")
+    except ValueError:
+        sla_hours = 48
+    sla_hours = sla_hours if sla_hours > 0 else 48
     req = PreApprovalRequest(
         requester_id=user.id,
         source_query_id=source_query.id if source_query else None,
@@ -135,6 +175,8 @@ def create_pre_approval(
         justification=justification,
         copilot_initial_response=initial_response,
         copilot_initial_decision=initial_decision,
+        created_at=now,
+        due_at=now + timedelta(hours=sla_hours),
     )
     db.add(req)
     db.flush()
@@ -151,6 +193,13 @@ def create_pre_approval(
             "copilot_initial_decision": initial_decision,
         },
     )
+    if Role(user.role) == Role.EMPLOYEE:
+        notify_roles(
+            db, {Role.ADMIN.value, Role.COMPLIANCE.value},
+            type="PRE_APPROVAL_CREATED", title="Nova solicitação de pré-aprovação",
+            body=f"{product_label or 'Produto não informado'} · R$ {estimated_amount or 0:,.2f}",
+            entity="pre_approval_requests", entity_id=req.id,
+        )
     db.commit()
     db.refresh(req)
     return req
@@ -215,6 +264,13 @@ def update_status(
             "source_query_id": r.source_query_id,
         },
     )
+    if target in _OPINION_REQUIRED or (target == "CANCELLED" and actor.id != r.requester_id):
+        notify_user(
+            db, r.requester_id, type="PRE_APPROVAL_DECIDED",
+            title="Sua pré-aprovação foi atualizada",
+            body=f"{r.product_label or f'Solicitação #{r.id}'} · {target}",
+            entity="pre_approval_requests", entity_id=r.id,
+        )
     db.commit()
     db.refresh(r)
     return r

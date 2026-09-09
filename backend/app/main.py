@@ -23,7 +23,7 @@ app = FastAPI(
         "As respostas apoiam a análise de compliance, mas não substituem "
         "a revisão humana quando exigida pela política interna."
     ),
-    version="1.0.0",
+    version="1.1.0",
     # hide docs in production
     docs_url=None if settings.is_production else "/docs",
     redoc_url=None if settings.is_production else "/redoc",
@@ -56,7 +56,7 @@ app.include_router(api_router, prefix="/api")
 def health():
     return {
         "status": "ok",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "disclaimer": (
             "As respostas do Compliance Copilot apoiam a análise de compliance, "
             "mas não substituem revisão humana quando exigida pela política interna."

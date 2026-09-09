@@ -58,6 +58,7 @@ class RetrievedChunk:
     score: float
     page_number: int | None = None
     section_title: str | None = None
+    document_version: str | None = None
 
 
 def _fold(text: str) -> str:
@@ -330,6 +331,7 @@ def retrieve(query: str, db: Session, top_k: int = TOP_K) -> list[RetrievedChunk
                 score=round(score, 4),
                 page_number=chunk.page_number,
                 section_title=chunk.section_title,
+                document_version=doc.version,
             )
         )
         if len(results) == top_k:

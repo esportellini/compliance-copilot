@@ -17,6 +17,7 @@ if db_url:
 from app.db.base import Base  # noqa: E402
 import app.models.audit, app.models.copilot, app.models.document  # noqa: F401,E402
 import app.models.pre_approval, app.models.product, app.models.restricted  # noqa: F401,E402
+import app.models.notification  # noqa: F401,E402
 import app.models.rule, app.models.setting, app.models.training, app.models.user  # noqa: F401,E402
 
 target_metadata = Base.metadata

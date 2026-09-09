@@ -16,15 +16,18 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 # Compliance pode ler tudo mas só admin altera.
 SETTING_DEFINITIONS: list[dict] = [
     {"key": "data_retention_days",         "section": "lgpd", "label": "Retenção de logs (dias)",          "type": "number",  "description": "Logs mais antigos que este prazo são removidos pela política de retenção"},
+    {"key": "pre_approval_sla_hours",      "section": "workflow", "label": "SLA de pré-aprovação (horas)", "type": "number", "description": "Prazo capturado quando uma nova solicitação é criada"},
 ]
 
 SECTION_LABELS = {
     "lgpd":       "LGPD / Privacidade",
+    "workflow":   "Fluxo operacional",
 }
 
 # Valores padrão para configurações não encontradas no banco
 DEFAULTS: dict[str, str] = {
     "data_retention_days":      "730",
+    "pre_approval_sla_hours":   "48",
 }
 
 
@@ -78,6 +81,12 @@ def update_setting(
 ):
     if key not in DEFAULTS:
         raise HTTPException(status_code=400, detail=f"Configuração desconhecida: {key}")
+    if key == "pre_approval_sla_hours":
+        try:
+            if int(value) <= 0 or int(value) > 8760:
+                raise ValueError
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="SLA deve ser um inteiro entre 1 e 8760 horas") from exc
 
     row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
     defn = next((d for d in SETTING_DEFINITIONS if d["key"] == key), {})

@@ -92,7 +92,11 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
         decision: count
         for decision, count in decision_q.group_by(CopilotAnswer.decision).all()
     }
-    pending = pending_q.count()
+    pending = pending_q.filter(PreApprovalRequest.status == "PENDING").count()
+    in_review = pending_q.filter(PreApprovalRequest.status == "IN_REVIEW").count()
+    overdue = pending_q.filter(PreApprovalRequest.due_at < now).count()
+    attention = (pending_q.filter(PreApprovalRequest.due_at.is_not(None), PreApprovalRequest.due_at <= now + timedelta(hours=12))
+                 .order_by(PreApprovalRequest.due_at.asc()).limit(5).all())
     active_docs = db.query(PolicyDocument).filter(PolicyDocument.status == "ACTIVE").count()
     restricted = db.query(FinancialProduct).filter(FinancialProduct.status.in_(["RESTRICTED","BLOCKED"])).count()
     daily_q = (db.query(func.date(CopilotQuery.created_at).label("day"), func.count().label("count"))
@@ -105,7 +109,12 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
     recent = recent_q.order_by(CopilotQuery.created_at.desc()).limit(5).all()
     return {
         "queries_this_month": queries_month, "by_decision": by_decision,
-        "pending_approvals": pending, "active_documents": active_docs,
+        "pending_approvals": pending + in_review, "pending_count": pending,
+        "in_review_count": in_review, "overdue_count": overdue,
+        "needs_attention": [{"id": item.id, "product_label": item.product_label,
+                              "status": item.status, "sla_status": item.sla_status,
+                              "due_at": str(item.due_at)} for item in attention],
+        "active_documents": active_docs,
         "restricted_products": restricted,
         "queries_by_day": [{"date": str(r.day), "count": r.count} for r in daily],
         "recent_queries": [{"id": q.id, "question": q.question[:80],

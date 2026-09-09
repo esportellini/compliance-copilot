@@ -36,10 +36,13 @@ def _columns_for(sql: str, table_name: str) -> set[str]:
         if not line or line.startswith(("PRIMARY ", "FOREIGN ", "CONSTRAINT ", "UNIQUE ")):
             continue
         columns.add(line.split()[0].strip('"'))
+    columns.update(re.findall(
+        rf"ALTER TABLE {re.escape(table_name)} ADD COLUMN ([a-z_]+) ", sql
+    ))
     return columns
 
 
-def test_initial_migration_matches_current_model_tables_and_columns():
+def test_migration_chain_matches_current_model_tables_and_columns():
     sql = _offline_postgres_sql()
     migrated_tables = set(re.findall(r"CREATE TABLE ([a-z_]+) \(", sql))
     migrated_tables.discard("alembic_version")

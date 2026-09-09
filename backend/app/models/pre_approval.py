@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import Date, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -31,12 +31,25 @@ class PreApprovalRequest(Base, TimestampMixin):
     review_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     requester = relationship("User", back_populates="pre_approvals")
     source_query = relationship("CopilotQuery")
     comments = relationship(
         "PreApprovalComment", back_populates="request", cascade="all, delete-orphan"
     )
+
+    @property
+    def sla_status(self) -> str:
+        if self.status not in {"PENDING", "IN_REVIEW"}:
+            return "COMPLETED"
+        if self.due_at is None:
+            return "ON_TIME"
+        due = self.due_at if self.due_at.tzinfo else self.due_at.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if due <= now:
+            return "OVERDUE"
+        return "DUE_SOON" if (due - now) <= timedelta(hours=12) else "ON_TIME"
 
 
 class PreApprovalComment(Base, TimestampMixin):

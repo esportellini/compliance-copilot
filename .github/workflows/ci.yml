@@ -15,6 +15,20 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: compliance
+          POSTGRES_PASSWORD: compliance
+          POSTGRES_DB: compliance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U compliance -d compliance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -32,6 +46,13 @@ jobs:
           cache-dependency-path: backend/requirements*.txt
       - name: Install dependencies
         run: python -m pip install -r requirements-dev.txt
+      - name: Upgrade released v1 schema to v1.1
+        env:
+          DATABASE_URL: postgresql+psycopg://compliance:compliance@localhost:5432/compliance
+        run: |
+          python -m alembic upgrade 0001_initial
+          python -m alembic upgrade head
+          python -m alembic current | grep 0002_operational_compliance
       - name: Run backend tests
         run: python -m pytest -q
       - name: Verify Alembic schema
